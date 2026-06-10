@@ -142,8 +142,18 @@ function LoginPage() {
             disabled={loading}
             className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow active:scale-[0.98] disabled:opacity-60"
           >
-            {loading ? "Entrando..." : "Entrar"}
+            {loading ? "Entrando..." : seedReady ? "Entrar" : "Preparando acesso..."}
           </button>
+
+          <button
+            type="button"
+            onClick={doResetAdmin}
+            disabled={resetLoading}
+            className="w-full rounded-xl border border-border bg-card py-2.5 text-xs font-semibold text-foreground disabled:opacity-60"
+          >
+            {resetLoading ? "Restaurando..." : "Restaurar acesso do administrador"}
+          </button>
+          {resetMsg && <p className="text-center text-[11px] text-foreground">{resetMsg}</p>}
 
           <button
             type="button"
@@ -155,7 +165,7 @@ function LoginPage() {
 
           <p className="text-center text-[11px] text-muted-foreground">
             Acesso inicial: <b>admin</b> / <b>admin123</b><br />
-            A senha padrão deverá ser alterada no primeiro acesso.
+            Use restaurar acesso se o login inicial estiver bloqueado.
           </p>
         </form>
 
@@ -169,7 +179,7 @@ function LoginPage() {
               <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3">
                 <p className="text-xs font-semibold text-foreground">Sou o administrador e perdi o acesso</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Esta ação redefine a senha do usuário <b>admin</b> para <b>admin123</b> e exige troca no próximo login.
+                  Esta ação cria ou corrige o usuário <b>admin</b>, ativa o perfil, garante permissão de administrador e redefine a senha para <b>admin123</b>.
                 </p>
                 <button
                   type="button"
