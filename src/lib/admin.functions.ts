@@ -98,7 +98,7 @@ async function restoreDefaultAdmin(options: { resetPassword: boolean; event: str
         username: DEFAULT_ADMIN.username,
         full_name: DEFAULT_ADMIN.fullName,
         role: "admin",
-        must_change_password: true,
+        must_change_password: false,
       },
     });
     if (error) throw new Error(error.message);
@@ -111,7 +111,7 @@ async function restoreDefaultAdmin(options: { resetPassword: boolean; event: str
         username: DEFAULT_ADMIN.username,
         full_name: DEFAULT_ADMIN.fullName,
         role: "admin",
-        must_change_password: true,
+        must_change_password: false,
       },
     };
     if (options.resetPassword) updatePayload.password = DEFAULT_ADMIN.password;
@@ -121,7 +121,7 @@ async function restoreDefaultAdmin(options: { resetPassword: boolean; event: str
   }
 
   if (!user?.id) throw new Error("Falha ao localizar o usuário administrador.");
-  await ensureAdminRows(supabaseAdmin, user.id, true);
+  await ensureAdminRows(supabaseAdmin, user.id, false);
   await supabaseAdmin.from("audit_log").insert({
     event: options.event,
     username: DEFAULT_ADMIN.username,
@@ -157,7 +157,7 @@ export const ensureAdminSeed = createServerFn({ method: "POST" }).handler(async 
         detail: "Senha do administrador padrão corrigida automaticamente para admin123.",
       });
     }
-    await ensureAdminRows(supabaseAdmin, existingAdmin.id, true);
+    await ensureAdminRows(supabaseAdmin, existingAdmin.id, false);
     return { seeded: false, userId: existingAdmin.id };
   }
 
