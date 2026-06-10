@@ -18,6 +18,27 @@ async function loadAdmin() {
   return supabaseAdmin;
 }
 
+async function adminPasswordWorks(): Promise<boolean> {
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !key) return false;
+    const client = createClient(url, key, {
+      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({
+      email: DEFAULT_ADMIN.email,
+      password: DEFAULT_ADMIN.password,
+    });
+    if (data.session) await client.auth.signOut();
+    return !error && !!data.user;
+  } catch (err) {
+    console.error("adminPasswordWorks", err);
+    return false;
+  }
+}
+
 async function findAuthUserByEmail(supabaseAdmin: any, email: string) {
   const normalized = email.trim().toLowerCase();
   for (let page = 1; page <= 20; page += 1) {
@@ -128,6 +149,14 @@ export const ensureAdminSeed = createServerFn({ method: "POST" }).handler(async 
   const supabaseAdmin = await loadAdmin();
   const existingAdmin = await findAuthUserByEmail(supabaseAdmin, DEFAULT_ADMIN.email);
   if (existingAdmin?.id) {
+    const passwordOk = await adminPasswordWorks();
+    if (!passwordOk) {
+      return restoreDefaultAdmin({
+        resetPassword: true,
+        event: "ADMIN_RESET",
+        detail: "Senha do administrador padrão corrigida automaticamente para admin123.",
+      });
+    }
     await ensureAdminRows(supabaseAdmin, existingAdmin.id, true);
     return { seeded: false, userId: existingAdmin.id };
   }
