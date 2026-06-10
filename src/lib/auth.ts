@@ -201,6 +201,15 @@ export const auth = {
     }
   },
 
+  async resetAdminPassword(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await resetAdminPassword();
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? "Falha ao redefinir senha do admin." };
+    }
+  },
+
   async login(
     username: string,
     password: string,
