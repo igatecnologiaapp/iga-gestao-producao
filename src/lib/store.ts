@@ -26,9 +26,11 @@ export const UNITS: Unit[] = [
 export interface Material {
   id: string;
   name: string;
-  unit: Unit;
-  purchasePrice: number;
-  purchaseQty: number;
+  unit: Unit | null;
+  purchasePrice: number | null;
+  purchaseQty: number | null;
+  category?: string | null;
+  notes?: string | null;
 }
 
 export interface SheetItem {
@@ -180,6 +182,7 @@ export const db = {
 
 export function unitCost(m: Material): number {
   if (!m.purchaseQty || m.purchaseQty <= 0) return 0;
+  if (m.purchasePrice == null) return 0;
   return m.purchasePrice / m.purchaseQty;
 }
 
