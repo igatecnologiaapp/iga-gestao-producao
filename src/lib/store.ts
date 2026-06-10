@@ -40,8 +40,13 @@ export interface SheetItem {
 export interface Product {
   id: string;
   name: string;
-  unit: Unit;
-  salePrice: number;
+  unit: Unit | null;
+  salePrice: number | null;
+  category?: string | null;
+  description?: string | null;
+  internalCode?: string | null;
+  barcode?: string | null;
+  notes?: string | null;
   sheet: SheetItem[];
 }
 
@@ -193,4 +198,39 @@ export function formatBRL(n: number): string {
 
 export function formatQty(n: number): string {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 4 });
+}
+
+export const OPTIONAL_PRODUCT_FIELDS: { key: keyof Product; label: string }[] = [
+  { key: "salePrice", label: "Valor de venda" },
+  { key: "unit", label: "Unidade de medida" },
+  { key: "category", label: "Categoria" },
+  { key: "description", label: "Descrição" },
+  { key: "internalCode", label: "Código interno" },
+  { key: "barcode", label: "Código de barras" },
+  { key: "notes", label: "Observações" },
+];
+
+export function missingProductFields(p: Product): string[] {
+  const missing: string[] = [];
+  for (const f of OPTIONAL_PRODUCT_FIELDS) {
+    const v = p[f.key];
+    if (v === null || v === undefined || v === "") missing.push(f.label);
+  }
+  if (!p.sheet || p.sheet.length === 0) missing.push("Ficha técnica");
+  return missing;
+}
+
+export type ProductStatus = "complete" | "partial" | "incomplete";
+
+export function productStatus(p: Product): ProductStatus {
+  const missing = missingProductFields(p);
+  if (missing.length === 0) return "complete";
+  const filled = OPTIONAL_PRODUCT_FIELDS.length + 1 - missing.length;
+  if (filled <= 1) return "incomplete";
+  return "partial";
+}
+
+export function formatBRLOrEmpty(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "Não informado";
+  return formatBRL(n);
 }
