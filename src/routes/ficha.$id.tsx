@@ -133,7 +133,7 @@ function FichaPage() {
                   <div className="min-w-0">
                     <div className="truncate font-semibold">{m.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {formatQty(item.quantity)} {m.unit} × {formatBRL(unitCost(m))}/{m.unit}
+                      {formatQty(item.quantity)} {m.unit ?? "un"} × {formatBRL(unitCost(m))}/{m.unit ?? "un"}
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
@@ -165,7 +165,7 @@ function FichaPage() {
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">Matéria-prima</span>
                 <select className="input" value={materialId} onChange={(e) => setMaterialId(e.target.value)}>
                   {materials.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name} ({formatBRL(unitCost(m))}/{m.unit})</option>
+                    <option key={m.id} value={m.id}>{m.name} ({formatBRL(unitCost(m))}/{m.unit ?? "un"})</option>
                   ))}
                 </select>
               </label>
