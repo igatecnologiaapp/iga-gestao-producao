@@ -20,11 +20,11 @@ export function UserMenu({ variant = "light" }: { variant?: "light" | "dark" }) 
   if (!session) return null;
   const initials = (session.fullName || session.username).slice(0, 2).toUpperCase();
 
-  function doLogout() {
-    auth.logout();
+  async function doLogout() {
+    await auth.logout();
     setConfirm(false);
     setOpen(false);
-    navigate({ to: "/login" });
+    navigate({ to: "/login", replace: true });
   }
 
   return (
