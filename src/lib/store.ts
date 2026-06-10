@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export type Unit =
   | "kg"
@@ -57,47 +58,102 @@ interface DB {
   products: Product[];
 }
 
-const KEY = "fichatec-db-v1";
 const initial: DB = { materials: [], products: [] };
-
-function read(): DB {
-  if (typeof window === "undefined") return initial;
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return initial;
-    return JSON.parse(raw) as DB;
-  } catch {
-    return initial;
-  }
-}
 
 let state: DB = initial;
 let hydrated = false;
+let hydrating = false;
+let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 const listeners = new Set<() => void>();
 
-function ensureHydrated() {
-  if (!hydrated && typeof window !== "undefined") {
-    state = read();
-    hydrated = true;
-  }
-}
-
-function write(next: DB) {
+function setState(next: DB) {
   state = next;
-  if (typeof window !== "undefined") {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  }
   listeners.forEach((l) => l());
 }
 
+async function loadAll(): Promise<DB> {
+  const [matsRes, prodsRes, itemsRes] = await Promise.all([
+    supabase.from("materials").select("*").order("name"),
+    supabase.from("products").select("*").order("name"),
+    supabase.from("sheet_items").select("*"),
+  ]);
+  if (matsRes.error || prodsRes.error || itemsRes.error) {
+    return state;
+  }
+  const materials: Material[] = (matsRes.data ?? []).map((m: any) => ({
+    id: m.id,
+    name: m.name,
+    unit: (m.unit ?? null) as Unit | null,
+    purchasePrice: m.purchase_price == null ? null : Number(m.purchase_price),
+    purchaseQty: m.purchase_qty == null ? null : Number(m.purchase_qty),
+    category: m.category ?? null,
+    notes: m.notes ?? null,
+  }));
+  const itemsByProduct = new Map<string, SheetItem[]>();
+  for (const it of itemsRes.data ?? []) {
+    const arr = itemsByProduct.get(it.product_id) ?? [];
+    arr.push({ id: it.id, materialId: it.material_id, quantity: Number(it.quantity) });
+    itemsByProduct.set(it.product_id, arr);
+  }
+  const products: Product[] = (prodsRes.data ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    unit: (p.unit ?? null) as Unit | null,
+    salePrice: p.sale_price == null ? null : Number(p.sale_price),
+    category: p.category ?? null,
+    description: p.description ?? null,
+    internalCode: p.internal_code ?? null,
+    barcode: p.barcode ?? null,
+    notes: p.notes ?? null,
+    sheet: itemsByProduct.get(p.id) ?? [],
+  }));
+  return { materials, products };
+}
+
+let reloadScheduled = false;
+async function reload() {
+  if (reloadScheduled) return;
+  reloadScheduled = true;
+  await new Promise((r) => setTimeout(r, 50));
+  reloadScheduled = false;
+  const next = await loadAll();
+  setState(next);
+}
+
+function startRealtime() {
+  if (realtimeChannel) return;
+  realtimeChannel = supabase
+    .channel("public:fichatec")
+    .on("postgres_changes", { event: "*", schema: "public", table: "materials" }, reload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "products" }, reload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "sheet_items" }, reload)
+    .subscribe();
+}
+
+async function ensureHydrated() {
+  if (hydrated || hydrating || typeof window === "undefined") return;
+  hydrating = true;
+  try {
+    const next = await loadAll();
+    setState(next);
+    hydrated = true;
+    startRealtime();
+  } finally {
+    hydrating = false;
+  }
+}
+
+export function refreshDB() {
+  void reload();
+}
+
 function subscribe(l: () => void) {
-  ensureHydrated();
+  void ensureHydrated();
   listeners.add(l);
   return () => listeners.delete(l);
 }
 
 function getSnapshot(): DB {
-  ensureHydrated();
   return state;
 }
 
@@ -109,74 +165,100 @@ export function useDB() {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
-const uid = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+function toMaterialRow(m: Partial<Omit<Material, "id">>) {
+  const row: any = {};
+  if (m.name !== undefined) row.name = m.name;
+  if (m.unit !== undefined) row.unit = m.unit;
+  if (m.purchasePrice !== undefined) row.purchase_price = m.purchasePrice;
+  if (m.purchaseQty !== undefined) row.purchase_qty = m.purchaseQty;
+  if (m.category !== undefined) row.category = m.category;
+  if (m.notes !== undefined) row.notes = m.notes;
+  return row;
+}
+
+function toProductRow(p: Partial<Omit<Product, "id" | "sheet">>) {
+  const row: any = {};
+  if (p.name !== undefined) row.name = p.name;
+  if (p.unit !== undefined) row.unit = p.unit;
+  if (p.salePrice !== undefined) row.sale_price = p.salePrice;
+  if (p.category !== undefined) row.category = p.category;
+  if (p.description !== undefined) row.description = p.description;
+  if (p.internalCode !== undefined) row.internal_code = p.internalCode;
+  if (p.barcode !== undefined) row.barcode = p.barcode;
+  if (p.notes !== undefined) row.notes = p.notes;
+  return row;
+}
+
+async function currentUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
 
 export const db = {
-  addMaterial(m: Omit<Material, "id">) {
-    write({ ...state, materials: [...state.materials, { ...m, id: uid() }] });
+  async addMaterial(m: Omit<Material, "id">) {
+    const uid = await currentUserId();
+    const { error } = await supabase
+      .from("materials")
+      .insert({ ...toMaterialRow(m), created_by: uid });
+    if (error) console.error("addMaterial:", error);
+    void reload();
   },
-  updateMaterial(id: string, patch: Partial<Material>) {
-    write({
-      ...state,
-      materials: state.materials.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+  async updateMaterial(id: string, patch: Partial<Material>) {
+    const { error } = await supabase
+      .from("materials")
+      .update(toMaterialRow(patch))
+      .eq("id", id);
+    if (error) console.error("updateMaterial:", error);
+    void reload();
+  },
+  async deleteMaterial(id: string) {
+    const { error } = await supabase.from("materials").delete().eq("id", id);
+    if (error) console.error("deleteMaterial:", error);
+    void reload();
+  },
+  async addProduct(p: Omit<Product, "id" | "sheet"> & { sheet?: SheetItem[] }) {
+    const uid = await currentUserId();
+    const { error } = await supabase
+      .from("products")
+      .insert({ ...toProductRow(p), created_by: uid });
+    if (error) console.error("addProduct:", error);
+    void reload();
+  },
+  async updateProduct(id: string, patch: Partial<Product>) {
+    const { sheet: _ignored, ...rest } = patch as any;
+    const { error } = await supabase
+      .from("products")
+      .update(toProductRow(rest))
+      .eq("id", id);
+    if (error) console.error("updateProduct:", error);
+    void reload();
+  },
+  async deleteProduct(id: string) {
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) console.error("deleteProduct:", error);
+    void reload();
+  },
+  async addSheetItem(productId: string, item: Omit<SheetItem, "id">) {
+    const { error } = await supabase.from("sheet_items").insert({
+      product_id: productId,
+      material_id: item.materialId,
+      quantity: item.quantity,
     });
+    if (error) console.error("addSheetItem:", error);
+    void reload();
   },
-  deleteMaterial(id: string) {
-    write({
-      ...state,
-      materials: state.materials.filter((m) => m.id !== id),
-      products: state.products.map((p) => ({
-        ...p,
-        sheet: p.sheet.filter((s) => s.materialId !== id),
-      })),
-    });
+  async updateSheetItem(_productId: string, itemId: string, patch: Partial<SheetItem>) {
+    const row: any = {};
+    if (patch.materialId !== undefined) row.material_id = patch.materialId;
+    if (patch.quantity !== undefined) row.quantity = patch.quantity;
+    const { error } = await supabase.from("sheet_items").update(row).eq("id", itemId);
+    if (error) console.error("updateSheetItem:", error);
+    void reload();
   },
-  addProduct(p: Omit<Product, "id" | "sheet"> & { sheet?: SheetItem[] }) {
-    write({
-      ...state,
-      products: [...state.products, { ...p, sheet: p.sheet ?? [], id: uid() }],
-    });
-  },
-  updateProduct(id: string, patch: Partial<Product>) {
-    write({
-      ...state,
-      products: state.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    });
-  },
-  deleteProduct(id: string) {
-    write({ ...state, products: state.products.filter((p) => p.id !== id) });
-  },
-  addSheetItem(productId: string, item: Omit<SheetItem, "id">) {
-    write({
-      ...state,
-      products: state.products.map((p) =>
-        p.id === productId ? { ...p, sheet: [...p.sheet, { ...item, id: uid() }] } : p,
-      ),
-    });
-  },
-  updateSheetItem(productId: string, itemId: string, patch: Partial<SheetItem>) {
-    write({
-      ...state,
-      products: state.products.map((p) =>
-        p.id === productId
-          ? {
-              ...p,
-              sheet: p.sheet.map((s) => (s.id === itemId ? { ...s, ...patch } : s)),
-            }
-          : p,
-      ),
-    });
-  },
-  removeSheetItem(productId: string, itemId: string) {
-    write({
-      ...state,
-      products: state.products.map((p) =>
-        p.id === productId ? { ...p, sheet: p.sheet.filter((s) => s.id !== itemId) } : p,
-      ),
-    });
+  async removeSheetItem(_productId: string, itemId: string) {
+    const { error } = await supabase.from("sheet_items").delete().eq("id", itemId);
+    if (error) console.error("removeSheetItem:", error);
+    void reload();
   },
 };
 
