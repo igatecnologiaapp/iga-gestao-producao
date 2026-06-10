@@ -9,14 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as ProdutosRouteImport } from './routes/produtos'
 import { Route as MateriasPrimasRouteImport } from './routes/materias-primas'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as FichasRouteImport } from './routes/fichas'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as AuditoriaRouteImport } from './routes/auditoria'
+import { Route as AlterarSenhaRouteImport } from './routes/alterar-senha'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as FichaIdRouteImport } from './routes/ficha.$id'
 
+const UsuariosRoute = UsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RelatoriosRoute = RelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
@@ -32,9 +42,29 @@ const MateriasPrimasRoute = MateriasPrimasRouteImport.update({
   path: '/materias-primas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FichasRoute = FichasRouteImport.update({
   id: '/fichas',
   path: '/fichas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuditoriaRoute = AuditoriaRouteImport.update({
+  id: '/auditoria',
+  path: '/auditoria',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlterarSenhaRoute = AlterarSenhaRouteImport.update({
+  id: '/alterar-senha',
+  path: '/alterar-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -55,29 +85,44 @@ const FichaIdRoute = FichaIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alterar-senha': typeof AlterarSenhaRoute
+  '/auditoria': typeof AuditoriaRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/fichas': typeof FichasRoute
+  '/login': typeof LoginRoute
   '/materias-primas': typeof MateriasPrimasRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
+  '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alterar-senha': typeof AlterarSenhaRoute
+  '/auditoria': typeof AuditoriaRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/fichas': typeof FichasRoute
+  '/login': typeof LoginRoute
   '/materias-primas': typeof MateriasPrimasRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
+  '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alterar-senha': typeof AlterarSenhaRoute
+  '/auditoria': typeof AuditoriaRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/fichas': typeof FichasRoute
+  '/login': typeof LoginRoute
   '/materias-primas': typeof MateriasPrimasRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
+  '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
 }
@@ -85,44 +130,71 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/alterar-senha'
+    | '/auditoria'
+    | '/configuracoes'
     | '/fichas'
+    | '/login'
     | '/materias-primas'
     | '/produtos'
     | '/relatorios'
+    | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/alterar-senha'
+    | '/auditoria'
+    | '/configuracoes'
     | '/fichas'
+    | '/login'
     | '/materias-primas'
     | '/produtos'
     | '/relatorios'
+    | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
   id:
     | '__root__'
     | '/'
+    | '/alterar-senha'
+    | '/auditoria'
+    | '/configuracoes'
     | '/fichas'
+    | '/login'
     | '/materias-primas'
     | '/produtos'
     | '/relatorios'
+    | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlterarSenhaRoute: typeof AlterarSenhaRoute
+  AuditoriaRoute: typeof AuditoriaRoute
+  ConfiguracoesRoute: typeof ConfiguracoesRoute
   FichasRoute: typeof FichasRoute
+  LoginRoute: typeof LoginRoute
   MateriasPrimasRoute: typeof MateriasPrimasRoute
   ProdutosRoute: typeof ProdutosRoute
   RelatoriosRoute: typeof RelatoriosRoute
+  UsuariosRoute: typeof UsuariosRoute
   FichaIdRoute: typeof FichaIdRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/usuarios': {
+      id: '/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof UsuariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/relatorios': {
       id: '/relatorios'
       path: '/relatorios'
@@ -144,11 +216,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MateriasPrimasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/fichas': {
       id: '/fichas'
       path: '/fichas'
       fullPath: '/fichas'
       preLoaderRoute: typeof FichasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracoes': {
+      id: '/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ConfiguracoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auditoria': {
+      id: '/auditoria'
+      path: '/auditoria'
+      fullPath: '/auditoria'
+      preLoaderRoute: typeof AuditoriaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alterar-senha': {
+      id: '/alterar-senha'
+      path: '/alterar-senha'
+      fullPath: '/alterar-senha'
+      preLoaderRoute: typeof AlterarSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -177,10 +277,15 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlterarSenhaRoute: AlterarSenhaRoute,
+  AuditoriaRoute: AuditoriaRoute,
+  ConfiguracoesRoute: ConfiguracoesRoute,
   FichasRoute: FichasRoute,
+  LoginRoute: LoginRoute,
   MateriasPrimasRoute: MateriasPrimasRoute,
   ProdutosRoute: ProdutosRoute,
   RelatoriosRoute: RelatoriosRoute,
+  UsuariosRoute: UsuariosRoute,
   FichaIdRoute: FichaIdRoute,
   ProdutoIdRoute: ProdutoIdRoute,
 }
