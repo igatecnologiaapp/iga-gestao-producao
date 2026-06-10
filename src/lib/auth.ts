@@ -210,7 +210,11 @@ export const auth = {
     const email = usernameToEmail(u);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
-      await logAudit("LOGIN_FAIL", u, null, error?.message);
+      try {
+        await logLoginFail({ data: { username: u, device: device(), detail: error?.message } });
+      } catch {
+        // ignore
+      }
       const msg = (error?.message ?? "").toLowerCase();
       if (msg.includes("invalid")) return { ok: false, error: "bad_password" };
       return { ok: false, error: "not_found" };
