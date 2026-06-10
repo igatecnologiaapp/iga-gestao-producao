@@ -133,13 +133,14 @@ function RootComponent() {
 }
 
 function AuthGate({ children }: { children: ReactNode }) {
-  const { session, users } = useAuth();
+  const { session, users, ready } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const isLogin = pathname === "/login";
   const isChangePw = pathname === "/alterar-senha";
 
   useEffect(() => {
+    if (!ready) return;
     if (!session && !isLogin) {
       navigate({ to: "/login", replace: true });
       return;
@@ -152,12 +153,12 @@ function AuthGate({ children }: { children: ReactNode }) {
         navigate({ to: "/", replace: true });
       }
     }
-  }, [session, users, pathname, isLogin, isChangePw, navigate]);
+  }, [ready, session, users, pathname, isLogin, isChangePw, navigate]);
 
-  if (!session && !isLogin) {
+  if (!ready || (!session && !isLogin)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Redirecionando para o login...
+        Carregando...
       </div>
     );
   }

@@ -8,7 +8,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { session } = useAuth();
+  const { session, users } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -17,24 +17,17 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Garante criação do admin inicial (idempotente — no-op após primeiro seed)
+    void auth.ensureAdminSeed();
+  }, []);
+
+  useEffect(() => {
     if (session) {
-      navigate({ to: session.userId && needsChange() ? "/alterar-senha" : "/" });
+      const me = users.find((u) => u.id === session.userId);
+      navigate({ to: me?.mustChangePassword ? "/alterar-senha" : "/" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
-
-  function needsChange(): boolean {
-    // Lazy check via auth store
-    try {
-      const raw = localStorage.getItem("fichatec-auth-v1");
-      if (!raw) return false;
-      const db = JSON.parse(raw);
-      const u = db.users?.find((x: any) => x.id === db.session?.userId);
-      return !!u?.mustChangePassword;
-    } catch {
-      return false;
-    }
-  }
+  }, [session, users]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

@@ -1,4 +1,11 @@
 import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  ensureAdminSeed,
+  adminCreateUser,
+  adminUpdateUser,
+  adminSetActive,
+} from "@/lib/admin.functions";
 
 export type Role = "admin" | "user";
 
@@ -6,7 +13,6 @@ export interface User {
   id: string;
   fullName: string;
   username: string;
-  passwordHash: string; // "seed:plain" for first-time admin, else "sha256:<salt>:<hex>"
   role: Role;
   active: boolean;
   mustChangePassword: boolean;
@@ -41,80 +47,142 @@ export interface Session {
   startedAt: number;
 }
 
-interface AuthDB {
+interface AuthState {
+  session: Session | null;
   users: User[];
   audit: AuditEntry[];
-  session: Session | null;
+  ready: boolean;
 }
 
-const KEY = "fichatec-auth-v1";
+const USER_DOMAIN = "fichatec.app";
 
-const uid = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-const seedAdmin = (): User => ({
-  id: uid(),
-  fullName: "Administrador",
-  username: "admin",
-  passwordHash: "seed:admin123",
-  role: "admin",
-  active: true,
-  mustChangePassword: true,
-  createdAt: Date.now(),
-});
-
-const initial: AuthDB = { users: [], audit: [], session: null };
-
-function read(): AuthDB {
-  if (typeof window === "undefined") return initial;
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) {
-      const seeded: AuthDB = { users: [seedAdmin()], audit: [], session: null };
-      localStorage.setItem(KEY, JSON.stringify(seeded));
-      return seeded;
-    }
-    const parsed = JSON.parse(raw) as AuthDB;
-    if (!parsed.users || parsed.users.length === 0) {
-      parsed.users = [seedAdmin()];
-    }
-    return parsed;
-  } catch {
-    return { users: [seedAdmin()], audit: [], session: null };
-  }
+function usernameToEmail(username: string): string {
+  return `${username.trim().toLowerCase()}@${USER_DOMAIN}`;
 }
 
-let state: AuthDB = initial;
-let hydrated = false;
+const initial: AuthState = { session: null, users: [], audit: [], ready: false };
+let state: AuthState = initial;
 const listeners = new Set<() => void>();
+let bootstrapped = false;
 
-function ensureHydrated() {
-  if (!hydrated && typeof window !== "undefined") {
-    state = read();
-    hydrated = true;
-  }
-}
-
-function write(next: AuthDB) {
-  state = next;
-  if (typeof window !== "undefined") {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  }
+function emit(next: Partial<AuthState>) {
+  state = { ...state, ...next };
   listeners.forEach((l) => l());
 }
 
+function device(): string {
+  if (typeof navigator === "undefined") return "server";
+  return /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent) ? "Mobile" : "Desktop";
+}
+
+async function loadProfile(userId: string): Promise<Session | null> {
+  const [{ data: profile }, { data: roleRow }] = await Promise.all([
+    supabase.from("profiles").select("id, username, full_name, active").eq("id", userId).maybeSingle(),
+    supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+  ]);
+  if (!profile) return null;
+  if (profile.active === false) return null;
+  return {
+    userId: profile.id,
+    username: profile.username,
+    fullName: profile.full_name ?? profile.username,
+    role: (roleRow?.role as Role) ?? "user",
+    startedAt: Date.now(),
+  };
+}
+
+async function loadUsers(): Promise<User[]> {
+  const [{ data: profiles }, { data: roles }] = await Promise.all([
+    supabase.from("profiles").select("*").order("created_at", { ascending: true }),
+    supabase.from("user_roles").select("user_id, role"),
+  ]);
+  if (!profiles) return [];
+  const roleMap = new Map<string, Role>();
+  (roles ?? []).forEach((r: any) => roleMap.set(r.user_id, r.role));
+  return profiles.map((p: any) => ({
+    id: p.id,
+    fullName: p.full_name ?? p.username,
+    username: p.username,
+    role: roleMap.get(p.id) ?? "user",
+    active: p.active !== false,
+    mustChangePassword: !!p.must_change_password,
+    createdAt: new Date(p.created_at).getTime(),
+  }));
+}
+
+async function loadAudit(isAdmin: boolean): Promise<AuditEntry[]> {
+  if (!isAdmin) return [];
+  const { data } = await supabase
+    .from("audit_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  return (data ?? []).map((e: any) => ({
+    id: e.id,
+    userId: e.user_id,
+    username: e.username,
+    event: e.event as AuditEvent,
+    timestamp: new Date(e.created_at).getTime(),
+    device: e.device ?? "",
+    detail: e.detail ?? undefined,
+  }));
+}
+
+async function refresh(userId: string | null) {
+  const session = userId ? await loadProfile(userId) : null;
+  if (userId && !session) {
+    // Profile missing or inactive — sign out
+    await supabase.auth.signOut();
+    emit({ session: null, users: [], audit: [], ready: true });
+    return;
+  }
+  const isAdmin = session?.role === "admin";
+  const [users, audit] = session
+    ? await Promise.all([loadUsers(), loadAudit(isAdmin)])
+    : [[], []];
+  emit({ session, users, audit, ready: true });
+}
+
+async function logAudit(event: AuditEvent, username: string, userId: string | null, detail?: string) {
+  try {
+    await supabase.from("audit_log").insert({
+      event,
+      username,
+      user_id: userId,
+      device: device(),
+      detail: detail ?? null,
+    });
+  } catch {
+    // best effort
+  }
+}
+
+function bootstrap() {
+  if (bootstrapped || typeof window === "undefined") return;
+  bootstrapped = true;
+  supabase.auth.getSession().then(({ data }) => {
+    refresh(data.session?.user.id ?? null);
+  });
+  supabase.auth.onAuthStateChange((event, sess) => {
+    if (event === "SIGNED_OUT") {
+      emit({ session: null, users: [], audit: [], ready: true });
+      return;
+    }
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED" || event === "INITIAL_SESSION") {
+      refresh(sess?.user.id ?? null);
+    }
+  });
+}
+
 function subscribe(l: () => void) {
-  ensureHydrated();
+  bootstrap();
   listeners.add(l);
   return () => listeners.delete(l);
 }
-function getSnapshot(): AuthDB {
-  ensureHydrated();
+function getSnapshot(): AuthState {
   return state;
 }
-function getServerSnapshot(): AuthDB {
+function getServerSnapshot(): AuthState {
   return initial;
 }
 
@@ -122,150 +190,111 @@ export function useAuth() {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function hashPassword(password: string): Promise<string> {
-  const salt = uid().replace(/-/g, "").slice(0, 16);
-  const h = await sha256Hex(`${salt}:${password}`);
-  return `sha256:${salt}:${h}`;
-}
-
-async function verifyPassword(user: User, password: string): Promise<boolean> {
-  if (user.passwordHash.startsWith("seed:")) {
-    return user.passwordHash.slice(5) === password;
-  }
-  const parts = user.passwordHash.split(":");
-  if (parts.length !== 3 || parts[0] !== "sha256") return false;
-  const salt = parts[1];
-  const expected = parts[2];
-  const h = await sha256Hex(`${salt}:${password}`);
-  return h === expected;
-}
-
-function device(): string {
-  if (typeof navigator === "undefined") return "server";
-  const ua = navigator.userAgent;
-  if (/Mobile|Android|iPhone|iPad/i.test(ua)) return "Mobile";
-  return "Desktop";
-}
-
-function audit(
-  event: AuditEvent,
-  username: string,
-  userId: string | null,
-  detail?: string,
-) {
-  const entry: AuditEntry = {
-    id: uid(),
-    userId,
-    username,
-    event,
-    timestamp: Date.now(),
-    device: device(),
-    detail,
-  };
-  write({ ...state, audit: [entry, ...state.audit].slice(0, 1000) });
-}
-
 export const auth = {
-  async login(username: string, password: string): Promise<{ ok: true } | { ok: false; error: "missing" | "not_found" | "inactive" | "bad_password" }> {
-    ensureHydrated();
+  async ensureAdminSeed(): Promise<void> {
+    try {
+      await ensureAdminSeed();
+    } catch (err) {
+      console.error("ensureAdminSeed", err);
+    }
+  },
+
+  async login(
+    username: string,
+    password: string,
+  ): Promise<{ ok: true } | { ok: false; error: "missing" | "not_found" | "inactive" | "bad_password" }> {
     const u = username.trim();
     if (!u || !password) return { ok: false, error: "missing" };
-    const user = state.users.find((x) => x.username.toLowerCase() === u.toLowerCase());
-    if (!user) {
-      audit("LOGIN_FAIL", u, null, "Usuário não encontrado");
+    const email = usernameToEmail(u);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      await logAudit("LOGIN_FAIL", u, null, error?.message);
+      const msg = (error?.message ?? "").toLowerCase();
+      if (msg.includes("invalid")) return { ok: false, error: "bad_password" };
       return { ok: false, error: "not_found" };
     }
-    if (!user.active) {
-      audit("LOGIN_FAIL", u, user.id, "Usuário inativo");
+    // Verify profile is active
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("active, username")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profile && profile.active === false) {
+      await supabase.auth.signOut();
       return { ok: false, error: "inactive" };
     }
-    const ok = await verifyPassword(user, password);
-    if (!ok) {
-      audit("LOGIN_FAIL", u, user.id, "Senha inválida");
-      return { ok: false, error: "bad_password" };
-    }
-    const session: Session = {
-      userId: user.id,
-      username: user.username,
-      fullName: user.fullName,
-      role: user.role,
-      startedAt: Date.now(),
-    };
-    write({ ...state, session });
-    audit("LOGIN", user.username, user.id);
+    await logAudit("LOGIN", profile?.username ?? u, data.user.id);
+    await refresh(data.user.id);
     return { ok: true };
   },
-  logout() {
-    ensureHydrated();
+
+  async logout(): Promise<void> {
     const s = state.session;
-    if (s) audit("LOGOUT", s.username, s.userId);
-    write({ ...state, session: null });
+    if (s) await logAudit("LOGOUT", s.username, s.userId);
+    await supabase.auth.signOut();
+    emit({ session: null, users: [], audit: [], ready: true });
   },
-  async changePassword(userId: string, newPassword: string): Promise<{ ok: boolean; error?: string }> {
-    ensureHydrated();
-    if (newPassword.length < 4) return { ok: false, error: "Senha muito curta (mínimo 4 caracteres)." };
-    const hash = await hashPassword(newPassword);
-    const users = state.users.map((x) =>
-      x.id === userId ? { ...x, passwordHash: hash, mustChangePassword: false } : x,
-    );
-    const target = users.find((x) => x.id === userId);
-    write({ ...state, users });
-    if (target) audit("PASSWORD_CHANGE", target.username, target.id);
+
+  async changePassword(_userId: string, newPassword: string): Promise<{ ok: boolean; error?: string }> {
+    if (newPassword.length < 6) return { ok: false, error: "Senha muito curta (mínimo 6 caracteres)." };
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { ok: false, error: error.message };
+    const s = state.session;
+    if (s) {
+      await supabase.from("profiles").update({ must_change_password: false }).eq("id", s.userId);
+      await logAudit("PASSWORD_CHANGE", s.username, s.userId);
+      await refresh(s.userId);
+    }
     return { ok: true };
   },
+
   async createUser(input: { fullName: string; username: string; password: string; role: Role }): Promise<{ ok: boolean; error?: string }> {
-    ensureHydrated();
-    const username = input.username.trim();
-    if (!input.fullName.trim() || !username || !input.password) return { ok: false, error: "Preencha todos os campos obrigatórios." };
-    if (state.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) return { ok: false, error: "Nome de usuário já existe." };
-    const passwordHash = await hashPassword(input.password);
-    const user: User = {
-      id: uid(),
-      fullName: input.fullName.trim(),
-      username,
-      passwordHash,
-      role: input.role,
-      active: true,
-      mustChangePassword: false,
-      createdAt: Date.now(),
-    };
-    write({ ...state, users: [...state.users, user] });
-    audit("USER_CREATE", user.username, user.id, `Perfil: ${user.role}`);
-    return { ok: true };
+    try {
+      await adminCreateUser({ data: input });
+      const s = state.session;
+      await logAudit("USER_CREATE", input.username, s?.userId ?? null, `Perfil: ${input.role}`);
+      if (s) await refresh(s.userId);
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? "Erro ao criar usuário." };
+    }
   },
-  async updateUser(id: string, patch: Partial<Pick<User, "fullName" | "role">> & { newPassword?: string }) {
-    ensureHydrated();
-    let hash: string | undefined;
-    if (patch.newPassword) hash = await hashPassword(patch.newPassword);
-    const users = state.users.map((u) =>
-      u.id === id
-        ? {
-            ...u,
-            ...(patch.fullName !== undefined ? { fullName: patch.fullName } : {}),
-            ...(patch.role !== undefined ? { role: patch.role } : {}),
-            ...(hash ? { passwordHash: hash, mustChangePassword: false } : {}),
-          }
-        : u,
-    );
-    write({ ...state, users });
-    const u = users.find((x) => x.id === id);
-    if (u) audit("USER_UPDATE", u.username, u.id);
-    if (u && hash) audit("PASSWORD_CHANGE", u.username, u.id, "Alterada por administrador");
+
+  async updateUser(id: string, patch: Partial<Pick<User, "fullName" | "role">> & { newPassword?: string }): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await adminUpdateUser({
+        data: {
+          id,
+          fullName: patch.fullName,
+          role: patch.role,
+          newPassword: patch.newPassword,
+        },
+      });
+      const target = state.users.find((u) => u.id === id);
+      if (target) {
+        await logAudit("USER_UPDATE", target.username, target.id);
+        if (patch.newPassword) await logAudit("PASSWORD_CHANGE", target.username, target.id, "Alterada por administrador");
+      }
+      const s = state.session;
+      if (s) await refresh(s.userId);
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? "Erro ao atualizar usuário." };
+    }
   },
-  toggleActive(id: string) {
-    ensureHydrated();
-    const users = state.users.map((u) => (u.id === id ? { ...u, active: !u.active } : u));
-    const u = users.find((x) => x.id === id);
-    write({ ...state, users });
-    if (u) audit(u.active ? "USER_ACTIVATE" : "USER_DEACTIVATE", u.username, u.id);
+
+  async toggleActive(id: string): Promise<void> {
+    const target = state.users.find((u) => u.id === id);
+    if (!target) return;
+    const nextActive = !target.active;
+    try {
+      await adminSetActive({ data: { id, active: nextActive } });
+      await logAudit(nextActive ? "USER_ACTIVATE" : "USER_DEACTIVATE", target.username, target.id);
+      const s = state.session;
+      if (s) await refresh(s.userId);
+    } catch (err) {
+      console.error("toggleActive", err);
+    }
   },
 };
 
