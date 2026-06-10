@@ -2,6 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const USER_DOMAIN = "fichatec.app";
+const DEFAULT_ADMIN = {
+  username: "admin",
+  email: "admin@fichatec.app",
+  password: "admin123",
+  fullName: "Administrador",
+} as const;
 
 export function usernameToEmail(username: string): string {
   return `${username.trim().toLowerCase()}@${USER_DOMAIN}`;
@@ -10,6 +16,98 @@ export function usernameToEmail(username: string): string {
 async function loadAdmin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
+}
+
+async function findAuthUserByEmail(supabaseAdmin: any, email: string) {
+  const normalized = email.trim().toLowerCase();
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    const found = data?.users?.find((u: any) => u.email?.toLowerCase() === normalized);
+    if (found || !data?.users || data.users.length < 1000) return found ?? null;
+  }
+  return null;
+}
+
+async function ensureAdminRows(supabaseAdmin: any, userId: string, mustChangePassword: boolean) {
+  const { data: staleProfile, error: staleErr } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("username", DEFAULT_ADMIN.username)
+    .maybeSingle();
+  if (staleErr) throw new Error(staleErr.message);
+  if (staleProfile && staleProfile.id !== userId) {
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({ username: `admin_recuperado_${Date.now()}` })
+      .eq("id", staleProfile.id);
+    if (error) throw new Error(error.message);
+  }
+
+  const { error: profileErr } = await supabaseAdmin.from("profiles").upsert(
+    {
+      id: userId,
+      username: DEFAULT_ADMIN.username,
+      full_name: DEFAULT_ADMIN.fullName,
+      active: true,
+      must_change_password: mustChangePassword,
+    },
+    { onConflict: "id" },
+  );
+  if (profileErr) throw new Error(profileErr.message);
+
+  const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+  if (delErr) throw new Error(delErr.message);
+  const { error: roleErr } = await supabaseAdmin
+    .from("user_roles")
+    .insert({ user_id: userId, role: "admin" });
+  if (roleErr) throw new Error(roleErr.message);
+}
+
+async function restoreDefaultAdmin(options: { resetPassword: boolean; event: string; detail: string }) {
+  const supabaseAdmin = await loadAdmin();
+  let user = await findAuthUserByEmail(supabaseAdmin, DEFAULT_ADMIN.email);
+
+  if (!user) {
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email: DEFAULT_ADMIN.email,
+      password: DEFAULT_ADMIN.password,
+      email_confirm: true,
+      user_metadata: {
+        username: DEFAULT_ADMIN.username,
+        full_name: DEFAULT_ADMIN.fullName,
+        role: "admin",
+        must_change_password: true,
+      },
+    });
+    if (error) throw new Error(error.message);
+    user = data.user;
+  } else {
+    const updatePayload: any = {
+      email_confirm: true,
+      user_metadata: {
+        ...(user.user_metadata ?? {}),
+        username: DEFAULT_ADMIN.username,
+        full_name: DEFAULT_ADMIN.fullName,
+        role: "admin",
+        must_change_password: true,
+      },
+    };
+    if (options.resetPassword) updatePayload.password = DEFAULT_ADMIN.password;
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user.id, updatePayload);
+    if (error) throw new Error(error.message);
+    user = data.user ?? user;
+  }
+
+  if (!user?.id) throw new Error("Falha ao localizar o usuário administrador.");
+  await ensureAdminRows(supabaseAdmin, user.id, true);
+  await supabaseAdmin.from("audit_log").insert({
+    event: options.event,
+    username: DEFAULT_ADMIN.username,
+    user_id: user.id,
+    detail: options.detail,
+  });
+  return { ok: true, userId: user.id, email: DEFAULT_ADMIN.email };
 }
 
 async function assertAdmin(supabase: any, userId: string) {
