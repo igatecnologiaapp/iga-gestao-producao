@@ -37,13 +37,13 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="px-5 pt-8 pb-6">
+      <header className="px-5 pt-6 pb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">FichaTec</p>
-            <h1 className="mt-1 text-3xl font-bold text-foreground">Custo real,<br/>na ponta do dedo.</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">FichaTec</p>
+            <h1 className="mt-1 text-2xl font-bold leading-tight text-foreground">Ficha Técnica<br/>dos Produtos</h1>
             {session && (
-              <p className="mt-2 text-sm text-muted-foreground">Olá, <b>{session.fullName}</b>. Bom trabalho!</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">Olá, <b>{session.fullName}</b>.</p>
             )}
           </div>
           <UserMenu />
