@@ -4,6 +4,8 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -11,6 +13,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useAuth } from "../lib/auth";
+import { BottomNav } from "../components/BottomNav";
 
 function NotFoundComponent() {
   return (
@@ -120,8 +124,48 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AuthGate>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </AuthGate>
     </QueryClientProvider>
+  );
+}
+
+function AuthGate({ children }: { children: ReactNode }) {
+  const { session, users } = useAuth();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const isLogin = pathname === "/login";
+  const isChangePw = pathname === "/alterar-senha";
+
+  useEffect(() => {
+    if (!session && !isLogin) {
+      navigate({ to: "/login", replace: true });
+      return;
+    }
+    if (session) {
+      const me = users.find((u) => u.id === session.userId);
+      if (me?.mustChangePassword && !isChangePw) {
+        navigate({ to: "/alterar-senha", replace: true });
+      } else if (isLogin) {
+        navigate({ to: "/", replace: true });
+      }
+    }
+  }, [session, users, pathname, isLogin, isChangePw, navigate]);
+
+  if (!session && !isLogin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Redirecionando para o login...
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {children}
+      {session && !isLogin && <BottomNav />}
+    </>
   );
 }

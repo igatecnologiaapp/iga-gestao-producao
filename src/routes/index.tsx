@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useDB, productCost, formatBRL, formatBRLOrEmpty } from "@/lib/store";
+import { UserMenu } from "@/components/UserMenu";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -14,6 +16,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { materials, products } = useDB();
+  const { session } = useAuth();
   const totalProducts = products.length;
   const totalMaterials = materials.length;
   const avgMargin =
@@ -34,10 +37,17 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="px-5 pt-10 pb-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-primary">FichaTec</p>
-        <h1 className="mt-1 text-3xl font-bold text-foreground">Custo real,<br/>na ponta do dedo.</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Saiba quanto cada produto realmente custa para produzir.</p>
+      <header className="px-5 pt-8 pb-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">FichaTec</p>
+            <h1 className="mt-1 text-3xl font-bold text-foreground">Custo real,<br/>na ponta do dedo.</h1>
+            {session && (
+              <p className="mt-2 text-sm text-muted-foreground">Olá, <b>{session.fullName}</b>. Bom trabalho!</p>
+            )}
+          </div>
+          <UserMenu />
+        </div>
       </header>
 
       <section className="mx-5 grid grid-cols-3 gap-3 rounded-2xl bg-card p-4 shadow-sm border border-border">
