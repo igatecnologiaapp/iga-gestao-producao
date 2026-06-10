@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
-import { useDB, productCost, formatBRL } from "@/lib/store";
+import { useDB, productCost, formatBRL, formatBRLOrEmpty } from "@/lib/store";
 
 export const Route = createFileRoute("/relatorios")({
   head: () => ({ meta: [{ title: "Relatórios — FichaTec" }] }),
@@ -12,14 +12,16 @@ function RelatoriosPage() {
 
   const rows = products.map((p) => {
     const cost = productCost(p, materials);
-    const profit = p.salePrice - cost;
-    const margin = p.salePrice > 0 ? (profit / p.salePrice) * 100 : 0;
-    const costPct = p.salePrice > 0 ? (cost / p.salePrice) * 100 : 0;
-    return { p, cost, profit, margin, costPct };
+    const hasSale = p.salePrice != null && p.salePrice > 0;
+    const sale = p.salePrice ?? 0;
+    const profit = hasSale ? sale - cost : null;
+    const margin = hasSale ? ((sale - cost) / sale) * 100 : null;
+    const costPct = hasSale ? (cost / sale) * 100 : null;
+    return { p, cost, profit, margin, costPct, hasSale, sale };
   });
 
   const totalCost = rows.reduce((s, r) => s + r.cost, 0);
-  const totalSale = rows.reduce((s, r) => s + r.p.salePrice, 0);
+  const totalSale = rows.reduce((s, r) => s + (r.p.salePrice ?? 0), 0);
   const totalProfit = totalSale - totalCost;
   const avgMargin = totalSale > 0 ? (totalProfit / totalSale) * 100 : 0;
 
@@ -45,22 +47,35 @@ function RelatoriosPage() {
           </div>
         )}
         <div className="space-y-2">
-          {rows.map(({ p, cost, profit, margin, costPct }) => (
+          {rows.map(({ p, cost, profit, margin, costPct, hasSale }) => (
             <Link key={p.id} to="/produto/$id" params={{ id: p.id }} className="block rounded-2xl border border-border bg-card p-4 shadow-sm active:scale-[0.99]">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">Custo {formatBRL(cost)} · Venda {formatBRL(p.salePrice)}</div>
+                  <div className="text-xs text-muted-foreground">Custo {formatBRL(cost)} · Venda {formatBRLOrEmpty(p.salePrice)}</div>
                 </div>
-                <div className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${margin >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
-                  {margin.toFixed(0)}%
+                <div className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                  margin == null
+                    ? "bg-muted text-muted-foreground"
+                    : margin >= 0
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-destructive/10 text-destructive"
+                }`}>
+                  {margin == null ? "—" : `${margin.toFixed(0)}%`}
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                <Mini label="Lucro" value={formatBRL(profit)} tone={profit >= 0 ? "good" : "bad"} />
-                <Mini label="Margem" value={`${margin.toFixed(1)}%`} />
-                <Mini label="Custo/Venda" value={`${costPct.toFixed(1)}%`} />
+                <Mini
+                  label="Lucro"
+                  value={profit == null ? "Não informado" : formatBRL(profit)}
+                  tone={profit == null ? undefined : profit >= 0 ? "good" : "bad"}
+                />
+                <Mini label="Margem" value={margin == null ? "Não informado" : `${margin.toFixed(1)}%`} />
+                <Mini label="Custo/Venda" value={costPct == null ? "Não informado" : `${costPct.toFixed(1)}%`} />
               </div>
+              {!hasSale && (
+                <div className="mt-2 text-[11px] text-muted-foreground">Valor de venda não informado.</div>
+              )}
             </Link>
           ))}
         </div>
