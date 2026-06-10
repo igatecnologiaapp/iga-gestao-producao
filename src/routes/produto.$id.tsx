@@ -1,6 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
-import { useDB, unitCost, productCost, formatBRL, formatQty } from "@/lib/store";
+import {
+  useDB,
+  unitCost,
+  productCost,
+  formatBRL,
+  formatBRLOrEmpty,
+  formatQty,
+  missingProductFields,
+  productStatus,
+} from "@/lib/store";
 
 export const Route = createFileRoute("/produto/$id")({
   head: () => ({ meta: [{ title: "Detalhes do produto — FichaTec" }] }),
@@ -22,25 +31,52 @@ function ProdutoDetalhe() {
   }
 
   const cost = productCost(product, materials);
-  const profit = product.salePrice - cost;
-  const margin = product.salePrice > 0 ? (profit / product.salePrice) * 100 : 0;
-  const costPct = product.salePrice > 0 ? (cost / product.salePrice) * 100 : 0;
+  const hasSale = product.salePrice != null && product.salePrice > 0;
+  const sale = product.salePrice ?? 0;
+  const profit = hasSale ? sale - cost : null;
+  const margin = hasSale ? ((sale - cost) / sale) * 100 : null;
+  const costPct = hasSale ? (cost / sale) * 100 : null;
+  const missing = missingProductFields(product);
+  const status = productStatus(product);
 
   return (
     <div className="min-h-screen bg-background pb-12">
-      <PageHeader title={product.name} subtitle={`por ${product.unit}`} backTo="/produtos" />
+      <PageHeader title={product.name} subtitle={product.unit ? `por ${product.unit}` : "unidade não informada"} backTo="/produtos" />
+
+      {missing.length > 0 && (
+        <div className="mx-4 mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          <div className="font-semibold">
+            {status === "incomplete" ? "Cadastro incompleto" : "Cadastro pendente"}
+          </div>
+          <p className="mt-0.5">
+            Este produto possui informações pendentes de preenchimento. Você pode completar os dados a qualquer momento.
+          </p>
+          <p className="mt-1 text-amber-800/80">
+            Pendente: {missing.join(", ")}
+          </p>
+        </div>
+      )}
 
       <section className="mx-4 mt-4 rounded-2xl border border-border bg-gradient-to-br from-primary/10 to-accent/30 p-5">
         <div className="text-xs uppercase tracking-widest text-muted-foreground">Custo total real</div>
         <div className="mt-1 text-3xl font-bold text-primary">{formatBRL(cost)}</div>
         <div className="mt-1 text-xs text-muted-foreground">
-          Venda {formatBRL(product.salePrice)} · Lucro {formatBRL(profit)}
+          {hasSale ? (
+            <>Venda {formatBRL(sale)} · Lucro {formatBRL(profit as number)}</>
+          ) : (
+            <>Valor de venda não informado.</>
+          )}
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <Mini label="Margem" value={`${margin.toFixed(1)}%`} />
-          <Mini label="Custo/Venda" value={`${costPct.toFixed(1)}%`} />
+          <Mini label="Margem" value={margin == null ? "—" : `${margin.toFixed(1)}%`} />
+          <Mini label="Custo/Venda" value={costPct == null ? "—" : `${costPct.toFixed(1)}%`} />
           <Mini label="Itens" value={product.sheet.length} />
         </div>
+        {!hasSale && (
+          <div className="mt-3 text-center text-[11px] text-muted-foreground">
+            Defina um valor de venda para calcular margem e lucro.
+          </div>
+        )}
       </section>
 
       <div className="mt-6 px-4">

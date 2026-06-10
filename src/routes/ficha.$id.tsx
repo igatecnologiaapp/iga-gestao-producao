@@ -40,9 +40,11 @@ function FichaPage() {
   }
 
   const cost = productCost(product, materials);
-  const profit = product.salePrice - cost;
-  const margin = product.salePrice > 0 ? (profit / product.salePrice) * 100 : 0;
-  const costPct = product.salePrice > 0 ? (cost / product.salePrice) * 100 : 0;
+  const hasSale = product.salePrice != null && product.salePrice > 0;
+  const sale = product.salePrice ?? 0;
+  const profit = hasSale ? sale - cost : null;
+  const margin = hasSale ? ((sale - cost) / sale) * 100 : null;
+  const costPct = hasSale ? (cost / sale) * 100 : null;
 
   function openNew() {
     if (materials.length === 0) {
@@ -85,17 +87,29 @@ function FichaPage() {
 
   return (
     <div className="min-h-screen bg-background pb-28">
-      <PageHeader title={product.name} subtitle={`Ficha técnica · por ${product.unit}`} backTo="/produtos" />
+      <PageHeader title={product.name} subtitle={`Ficha técnica${product.unit ? ` · por ${product.unit}` : ""}`} backTo="/produtos" />
 
       <section className="mx-4 mt-4 rounded-2xl bg-card border border-border p-4 shadow-sm">
         <div className="grid grid-cols-2 gap-3">
           <Block label="Custo total" value={formatBRL(cost)} accent />
-          <Block label="Valor de venda" value={formatBRL(product.salePrice)} />
-          <Block label="Lucro bruto" value={formatBRL(profit)} tone={profit >= 0 ? "good" : "bad"} />
-          <Block label="Margem bruta" value={`${margin.toFixed(1)}%`} tone={margin >= 0 ? "good" : "bad"} />
+          <Block label="Valor de venda" value={hasSale ? formatBRL(sale) : "Não informado"} />
+          <Block
+            label="Lucro bruto"
+            value={profit == null ? "—" : formatBRL(profit)}
+            tone={profit == null ? undefined : profit >= 0 ? "good" : "bad"}
+          />
+          <Block
+            label="Margem bruta"
+            value={margin == null ? "—" : `${margin.toFixed(1)}%`}
+            tone={margin == null ? undefined : margin >= 0 ? "good" : "bad"}
+          />
         </div>
         <div className="mt-3 text-center text-xs text-muted-foreground">
-          Custo sobre venda: <b className="text-foreground">{costPct.toFixed(1)}%</b>
+          {hasSale ? (
+            <>Custo sobre venda: <b className="text-foreground">{(costPct as number).toFixed(1)}%</b></>
+          ) : (
+            <>Valor de venda não informado.</>
+          )}
         </div>
       </section>
 

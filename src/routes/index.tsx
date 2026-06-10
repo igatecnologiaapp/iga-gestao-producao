@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useDB, productCost, formatBRL } from "@/lib/store";
+import { useDB, productCost, formatBRL, formatBRLOrEmpty } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -77,7 +77,7 @@ function Index() {
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">Custo {formatBRL(cost)} · Venda {formatBRL(p.salePrice)}</div>
+                      <div className="text-xs text-muted-foreground">Custo {formatBRL(cost)} · Venda {formatBRLOrEmpty(p.salePrice)}</div>
                     </div>
                     <span className="text-primary text-sm">›</span>
                   </Link>
