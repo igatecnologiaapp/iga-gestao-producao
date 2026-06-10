@@ -279,6 +279,28 @@ export const resetAdminPassword = createServerFn({ method: "POST" }).handler(asy
   });
 });
 
+export const getLoginIdentityStatus = createServerFn({ method: "POST" })
+  .inputValidator((input: { username: string }) => input)
+  .handler(async ({ data }) => {
+    const username = data.username.trim().toLowerCase();
+    if (!username) return { exists: false, active: false, hasRole: false };
+    const supabaseAdmin = await loadAdmin();
+    const user = await findAuthUserByEmail(supabaseAdmin, usernameToEmail(username));
+    if (!user?.id) return { exists: false, active: false, hasRole: false };
+    const [{ data: profile, error: profileErr }, { data: roles, error: roleErr }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("active, username").eq("id", user.id).maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
+    ]);
+    if (profileErr) throw new Error(`Falha ao buscar profile: ${profileErr.message}`);
+    if (roleErr) throw new Error(`Falha ao buscar role: ${roleErr.message}`);
+    return {
+      exists: true,
+      active: profile?.active !== false,
+      hasRole: (roles ?? []).length > 0,
+      username: profile?.username ?? username,
+    };
+  });
+
 /**
  * Logs an unauthenticated login failure. Uses the admin client to bypass
  * RLS (the audit policy requires authenticated inserts).
