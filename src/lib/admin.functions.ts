@@ -126,39 +126,28 @@ async function assertAdmin(supabase: any, userId: string) {
  */
 export const ensureAdminSeed = createServerFn({ method: "POST" }).handler(async () => {
   const supabaseAdmin = await loadAdmin();
+  const existingAdmin = await findAuthUserByEmail(supabaseAdmin, DEFAULT_ADMIN.email);
+  if (existingAdmin?.id) {
+    await ensureAdminRows(supabaseAdmin, existingAdmin.id, true);
+    return { seeded: false, userId: existingAdmin.id };
+  }
+
   const { count, error: cErr } = await supabaseAdmin
     .from("user_roles")
     .select("*", { count: "exact", head: true })
     .eq("role", "admin");
   if (cErr) throw new Error(cErr.message);
-  if ((count ?? 0) > 0) return { seeded: false };
-
-  const email = usernameToEmail("admin");
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: "admin123",
-    email_confirm: true,
-    user_metadata: {
-      username: "admin",
-      full_name: "Administrador",
-      role: "admin",
-      must_change_password: true,
-    },
+  if ((count ?? 0) > 0) return restoreDefaultAdmin({
+    resetPassword: true,
+    event: "ADMIN_RESTORE",
+    detail: "Administrador padrão criado porque não existia em Auth.",
   });
-  if (error) {
-    // Provavelmente o usuário já existe sem role; tente garantir o role
-    const { data: list } = await supabaseAdmin.auth.admin.listUsers();
-    const existing = list?.users.find((u) => u.email === email);
-    if (existing) {
-      await supabaseAdmin
-        .from("user_roles")
-        .upsert({ user_id: existing.id, role: "admin" }, { onConflict: "user_id,role" });
-      return { seeded: true };
-    }
-    throw new Error(error.message);
-  }
-  // Trigger handle_new_user já criou profile + role conforme metadata.
-  return { seeded: true, userId: data.user?.id };
+
+  return restoreDefaultAdmin({
+    resetPassword: true,
+    event: "ADMIN_SEED",
+    detail: "Administrador inicial criado com credenciais padrão.",
+  });
 });
 
 export const adminCreateUser = createServerFn({ method: "POST" })
@@ -254,30 +243,11 @@ export const adminSetActive = createServerFn({ method: "POST" })
  * recovery path when no administrator can access the system.
  */
 export const resetAdminPassword = createServerFn({ method: "POST" }).handler(async () => {
-  const supabaseAdmin = await loadAdmin();
-  const email = usernameToEmail("admin");
-  const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
-  if (listErr) throw new Error(listErr.message);
-  const target = list?.users.find((u) => u.email === email);
-  if (!target) throw new Error("Usuário admin não encontrado.");
-  const { error: pErr } = await supabaseAdmin.auth.admin.updateUserById(target.id, {
-    password: "admin123",
-  });
-  if (pErr) throw new Error(pErr.message);
-  await supabaseAdmin
-    .from("profiles")
-    .update({ active: true, must_change_password: true })
-    .eq("id", target.id);
-  await supabaseAdmin
-    .from("user_roles")
-    .upsert({ user_id: target.id, role: "admin" }, { onConflict: "user_id,role" });
-  await supabaseAdmin.from("audit_log").insert({
+  return restoreDefaultAdmin({
+    resetPassword: true,
     event: "ADMIN_RESET",
-    username: "admin",
-    user_id: target.id,
-    detail: "Senha do administrador redefinida para padrão (admin123).",
+    detail: "Acesso do administrador restaurado para admin/admin123.",
   });
-  return { ok: true };
 });
 
 /**
