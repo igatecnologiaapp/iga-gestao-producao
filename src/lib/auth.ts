@@ -5,6 +5,8 @@ import {
   adminCreateUser,
   adminUpdateUser,
   adminSetActive,
+  resetAdminPassword,
+  logLoginFail,
 } from "@/lib/admin.functions";
 
 export type Role = "admin" | "user";
@@ -199,6 +201,15 @@ export const auth = {
     }
   },
 
+  async resetAdminPassword(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await resetAdminPassword();
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? "Falha ao redefinir senha do admin." };
+    }
+  },
+
   async login(
     username: string,
     password: string,
@@ -208,7 +219,11 @@ export const auth = {
     const email = usernameToEmail(u);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
-      await logAudit("LOGIN_FAIL", u, null, error?.message);
+      try {
+        await logLoginFail({ data: { username: u, device: device(), detail: error?.message } });
+      } catch {
+        // ignore
+      }
       const msg = (error?.message ?? "").toLowerCase();
       if (msg.includes("invalid")) return { ok: false, error: "bad_password" };
       return { ok: false, error: "not_found" };

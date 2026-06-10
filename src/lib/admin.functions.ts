@@ -149,3 +149,53 @@ export const adminSetActive = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/**
+ * Emergency reset for the default `admin` user. Sets password back to
+ * `admin123` and forces a password change on next login. Intended as a
+ * recovery path when no administrator can access the system.
+ */
+export const resetAdminPassword = createServerFn({ method: "POST" }).handler(async () => {
+  const supabaseAdmin = await loadAdmin();
+  const email = usernameToEmail("admin");
+  const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+  if (listErr) throw new Error(listErr.message);
+  const target = list?.users.find((u) => u.email === email);
+  if (!target) throw new Error("Usuário admin não encontrado.");
+  const { error: pErr } = await supabaseAdmin.auth.admin.updateUserById(target.id, {
+    password: "admin123",
+  });
+  if (pErr) throw new Error(pErr.message);
+  await supabaseAdmin
+    .from("profiles")
+    .update({ active: true, must_change_password: true })
+    .eq("id", target.id);
+  await supabaseAdmin
+    .from("user_roles")
+    .upsert({ user_id: target.id, role: "admin" }, { onConflict: "user_id,role" });
+  await supabaseAdmin.from("audit_log").insert({
+    event: "ADMIN_RESET",
+    username: "admin",
+    user_id: target.id,
+    detail: "Senha do administrador redefinida para padrão (admin123).",
+  });
+  return { ok: true };
+});
+
+/**
+ * Logs an unauthenticated login failure. Uses the admin client to bypass
+ * RLS (the audit policy requires authenticated inserts).
+ */
+export const logLoginFail = createServerFn({ method: "POST" })
+  .inputValidator((input: { username: string; device?: string; detail?: string }) => input)
+  .handler(async ({ data }) => {
+    const supabaseAdmin = await loadAdmin();
+    await supabaseAdmin.from("audit_log").insert({
+      event: "LOGIN_FAIL",
+      username: data.username.slice(0, 64),
+      user_id: null,
+      device: data.device ?? null,
+      detail: data.detail?.slice(0, 200) ?? null,
+    });
+    return { ok: true };
+  });
