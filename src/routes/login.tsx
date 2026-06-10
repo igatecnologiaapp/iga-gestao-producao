@@ -15,6 +15,9 @@ function LoginPage() {
   const [show, setShow] = useState(false);
   const [errors, setErrors] = useState<{ username?: string; password?: string; global?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
     // Garante criação do admin inicial (idempotente — no-op após primeiro seed)
@@ -45,11 +48,24 @@ function LoginPage() {
     setLoading(false);
     if (!res.ok) {
       if (res.error === "not_found") setErrors({ username: "Usuário não encontrado.", global: "Usuário não encontrado." });
-      else if (res.error === "bad_password") setErrors({ password: "Senha inválida.", global: "Senha inválida." });
+      else if (res.error === "bad_password")
+        setErrors({
+          password: "Senha incorreta.",
+          global: "Senha incorreta. Consulte o Administrador.",
+        });
       else if (res.error === "inactive") setErrors({ global: "Usuário desativado. Contate o administrador." });
       else setErrors({ global: "Preencha todos os campos obrigatórios." });
       return;
     }
+  }
+
+  async function doResetAdmin() {
+    setResetLoading(true);
+    setResetMsg(null);
+    const r = await auth.resetAdminPassword();
+    setResetLoading(false);
+    if (r.ok) setResetMsg("Senha do administrador redefinida para admin / admin123. Faça login e altere imediatamente.");
+    else setResetMsg(r.error ?? "Falha ao redefinir senha do admin.");
   }
 
   return (
@@ -111,11 +127,52 @@ function LoginPage() {
             {loading ? "Entrando..." : "Entrar"}
           </button>
 
+          <button
+            type="button"
+            onClick={() => { setForgotOpen(true); setResetMsg(null); }}
+            className="block w-full text-center text-xs font-medium text-primary hover:underline"
+          >
+            Esqueci minha senha
+          </button>
+
           <p className="text-center text-[11px] text-muted-foreground">
             Acesso inicial: <b>admin</b> / <b>admin123</b><br />
             A senha padrão deverá ser alterada no primeiro acesso.
           </p>
         </form>
+
+        {forgotOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 px-4" onClick={() => setForgotOpen(false)}>
+            <div className="w-full max-w-sm rounded-2xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-base font-bold">Recuperação de senha</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Para redefinir sua senha, consulte o <b>Administrador do sistema</b>.
+              </p>
+              <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3">
+                <p className="text-xs font-semibold text-foreground">Sou o administrador e perdi o acesso</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Esta ação redefine a senha do usuário <b>admin</b> para <b>admin123</b> e exige troca no próximo login.
+                </p>
+                <button
+                  type="button"
+                  onClick={doResetAdmin}
+                  disabled={resetLoading}
+                  className="mt-2 w-full rounded-lg border border-destructive/40 bg-destructive/10 py-2 text-xs font-semibold text-destructive disabled:opacity-60"
+                >
+                  {resetLoading ? "Redefinindo..." : "Redefinir senha do admin"}
+                </button>
+                {resetMsg && <p className="mt-2 text-[11px] text-foreground">{resetMsg}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => setForgotOpen(false)}
+                className="mt-4 w-full rounded-xl border border-border py-2 text-sm font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
