@@ -77,12 +77,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "FichaTec — Ficha Técnica & Custos" },
-      { name: "description", content: "Cadastre matérias-primas, monte fichas técnicas e calcule o custo real dos seus produtos." },
-      { property: "og:title", content: "FichaTec" },
-      { property: "og:description", content: "Controle de ficha técnica e custo real de produção." },
+      { title: "Gestão de Produção" },
+      { name: "description", content: "Cadastro de matéria-prima, elaboração de fichas técnicas e calculo do custo real de produtos." },
+      { property: "og:title", content: "Gestão de Produção" },
+      { property: "og:description", content: "Cadastro de matéria-prima, elaboração de fichas técnicas e calculo do custo real de produtos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Gestão de Produção" },
+      { name: "twitter:description", content: "Cadastro de matéria-prima, elaboração de fichas técnicas e calculo do custo real de produtos." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3e119f11-79c4-4f71-9300-4c825ac0a41e/id-preview-d167b341--a82bfcfa-68c0-4fea-b49b-7d6405ba5881.lovable.app-1781095109943.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3e119f11-79c4-4f71-9300-4c825ac0a41e/id-preview-d167b341--a82bfcfa-68c0-4fea-b49b-7d6405ba5881.lovable.app-1781095109943.png" },
     ],
     links: [
       {
