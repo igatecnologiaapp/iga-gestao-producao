@@ -18,10 +18,16 @@ function LoginPage() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
+  const [seedReady, setSeedReady] = useState(false);
 
   useEffect(() => {
     // Garante criação do admin inicial (idempotente — no-op após primeiro seed)
-    void auth.ensureAdminSeed();
+    auth.ensureAdminSeed()
+      .catch((err) => {
+        console.error("Falha ao preparar acesso inicial", err);
+        setErrors({ global: "Falha ao preparar acesso inicial. Use Restaurar acesso do administrador." });
+      })
+      .finally(() => setSeedReady(true));
   }, []);
 
   useEffect(() => {
@@ -44,6 +50,14 @@ function LoginPage() {
       return;
     }
     setLoading(true);
+    try {
+      await auth.ensureAdminSeed();
+    } catch (err) {
+      console.error("Falha no ensureAdminSeed antes do login", err);
+      setLoading(false);
+      setErrors({ global: "Falha ao preparar o administrador inicial. Use Restaurar acesso do administrador." });
+      return;
+    }
     const res = await auth.login(username, password);
     setLoading(false);
     if (!res.ok) {
@@ -54,6 +68,10 @@ function LoginPage() {
           global: "Senha incorreta. Consulte o Administrador.",
         });
       else if (res.error === "inactive") setErrors({ global: "Usuário desativado. Contate o administrador." });
+      else if (res.error === "profile_error") setErrors({ global: "Login validado, mas o perfil não foi carregado. Restaure o acesso do administrador." });
+      else if (res.error === "role_error") setErrors({ global: "Login validado, mas a permissão não foi encontrada. Restaure o acesso do administrador." });
+      else if (res.error === "seed_error") setErrors({ global: "Falha ao criar ou restaurar o administrador inicial." });
+      else if (res.error === "auth_error") setErrors({ global: "Falha técnica na autenticação. Tente novamente." });
       else setErrors({ global: "Preencha todos os campos obrigatórios." });
       return;
     }
@@ -64,7 +82,7 @@ function LoginPage() {
     setResetMsg(null);
     const r = await auth.resetAdminPassword();
     setResetLoading(false);
-    if (r.ok) setResetMsg("Senha do administrador redefinida para admin / admin123. Faça login e altere imediatamente.");
+    if (r.ok) setResetMsg("Acesso do administrador restaurado. Tente entrar com usuário admin e senha admin123.");
     else setResetMsg(r.error ?? "Falha ao redefinir senha do admin.");
   }
 
