@@ -18,10 +18,16 @@ function LoginPage() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
+  const [seedReady, setSeedReady] = useState(false);
 
   useEffect(() => {
     // Garante criação do admin inicial (idempotente — no-op após primeiro seed)
-    void auth.ensureAdminSeed();
+    auth.ensureAdminSeed()
+      .catch((err) => {
+        console.error("Falha ao preparar acesso inicial", err);
+        setErrors({ global: "Falha ao preparar acesso inicial. Use Restaurar acesso do administrador." });
+      })
+      .finally(() => setSeedReady(true));
   }, []);
 
   useEffect(() => {
@@ -44,6 +50,14 @@ function LoginPage() {
       return;
     }
     setLoading(true);
+    try {
+      await auth.ensureAdminSeed();
+    } catch (err) {
+      console.error("Falha no ensureAdminSeed antes do login", err);
+      setLoading(false);
+      setErrors({ global: "Falha ao preparar o administrador inicial. Use Restaurar acesso do administrador." });
+      return;
+    }
     const res = await auth.login(username, password);
     setLoading(false);
     if (!res.ok) {
@@ -54,6 +68,10 @@ function LoginPage() {
           global: "Senha incorreta. Consulte o Administrador.",
         });
       else if (res.error === "inactive") setErrors({ global: "Usuário desativado. Contate o administrador." });
+      else if (res.error === "profile_error") setErrors({ global: "Login validado, mas o perfil não foi carregado. Restaure o acesso do administrador." });
+      else if (res.error === "role_error") setErrors({ global: "Login validado, mas a permissão não foi encontrada. Restaure o acesso do administrador." });
+      else if (res.error === "seed_error") setErrors({ global: "Falha ao criar ou restaurar o administrador inicial." });
+      else if (res.error === "auth_error") setErrors({ global: "Falha técnica na autenticação. Tente novamente." });
       else setErrors({ global: "Preencha todos os campos obrigatórios." });
       return;
     }
@@ -64,7 +82,7 @@ function LoginPage() {
     setResetMsg(null);
     const r = await auth.resetAdminPassword();
     setResetLoading(false);
-    if (r.ok) setResetMsg("Senha do administrador redefinida para admin / admin123. Faça login e altere imediatamente.");
+    if (r.ok) setResetMsg("Acesso do administrador restaurado. Tente entrar com usuário admin e senha admin123.");
     else setResetMsg(r.error ?? "Falha ao redefinir senha do admin.");
   }
 
@@ -124,8 +142,18 @@ function LoginPage() {
             disabled={loading}
             className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow active:scale-[0.98] disabled:opacity-60"
           >
-            {loading ? "Entrando..." : "Entrar"}
+            {loading ? "Entrando..." : seedReady ? "Entrar" : "Preparando acesso..."}
           </button>
+
+          <button
+            type="button"
+            onClick={doResetAdmin}
+            disabled={resetLoading}
+            className="w-full rounded-xl border border-border bg-card py-2.5 text-xs font-semibold text-foreground disabled:opacity-60"
+          >
+            {resetLoading ? "Restaurando..." : "Restaurar acesso do administrador"}
+          </button>
+          {resetMsg && <p className="text-center text-[11px] text-foreground">{resetMsg}</p>}
 
           <button
             type="button"
@@ -137,7 +165,7 @@ function LoginPage() {
 
           <p className="text-center text-[11px] text-muted-foreground">
             Acesso inicial: <b>admin</b> / <b>admin123</b><br />
-            A senha padrão deverá ser alterada no primeiro acesso.
+            Use restaurar acesso se o login inicial estiver bloqueado.
           </p>
         </form>
 
@@ -151,7 +179,7 @@ function LoginPage() {
               <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3">
                 <p className="text-xs font-semibold text-foreground">Sou o administrador e perdi o acesso</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Esta ação redefine a senha do usuário <b>admin</b> para <b>admin123</b> e exige troca no próximo login.
+                  Esta ação cria ou corrige o usuário <b>admin</b>, ativa o perfil, garante permissão de administrador e redefine a senha para <b>admin123</b>.
                 </p>
                 <button
                   type="button"

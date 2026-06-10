@@ -2,6 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const USER_DOMAIN = "fichatec.app";
+const DEFAULT_ADMIN = {
+  username: "admin",
+  email: "admin@fichatec.app",
+  password: "admin123",
+  fullName: "Administrador",
+} as const;
 
 export function usernameToEmail(username: string): string {
   return `${username.trim().toLowerCase()}@${USER_DOMAIN}`;
@@ -10,6 +16,119 @@ export function usernameToEmail(username: string): string {
 async function loadAdmin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
+}
+
+async function adminPasswordWorks(): Promise<boolean> {
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !key) return false;
+    const client = createClient(url, key, {
+      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await client.auth.signInWithPassword({
+      email: DEFAULT_ADMIN.email,
+      password: DEFAULT_ADMIN.password,
+    });
+    if (data.session) await client.auth.signOut();
+    return !error && !!data.user;
+  } catch (err) {
+    console.error("adminPasswordWorks", err);
+    return false;
+  }
+}
+
+async function findAuthUserByEmail(supabaseAdmin: any, email: string) {
+  const normalized = email.trim().toLowerCase();
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    const found = data?.users?.find((u: any) => u.email?.toLowerCase() === normalized);
+    if (found || !data?.users || data.users.length < 1000) return found ?? null;
+  }
+  return null;
+}
+
+async function ensureAdminRows(supabaseAdmin: any, userId: string, mustChangePassword: boolean) {
+  const { data: staleProfile, error: staleErr } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("username", DEFAULT_ADMIN.username)
+    .maybeSingle();
+  if (staleErr) throw new Error(staleErr.message);
+  if (staleProfile && staleProfile.id !== userId) {
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({ username: `admin_recuperado_${Date.now()}` })
+      .eq("id", staleProfile.id);
+    if (error) throw new Error(error.message);
+  }
+
+  const { error: profileErr } = await supabaseAdmin.from("profiles").upsert(
+    {
+      id: userId,
+      username: DEFAULT_ADMIN.username,
+      full_name: DEFAULT_ADMIN.fullName,
+      active: true,
+      must_change_password: mustChangePassword,
+    },
+    { onConflict: "id" },
+  );
+  if (profileErr) throw new Error(profileErr.message);
+
+  const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+  if (delErr) throw new Error(delErr.message);
+  const { error: roleErr } = await supabaseAdmin
+    .from("user_roles")
+    .insert({ user_id: userId, role: "admin" });
+  if (roleErr) throw new Error(roleErr.message);
+}
+
+async function restoreDefaultAdmin(options: { resetPassword: boolean; event: string; detail: string }) {
+  const supabaseAdmin = await loadAdmin();
+  let user = await findAuthUserByEmail(supabaseAdmin, DEFAULT_ADMIN.email);
+
+  if (!user) {
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email: DEFAULT_ADMIN.email,
+      password: DEFAULT_ADMIN.password,
+      email_confirm: true,
+      user_metadata: {
+        username: DEFAULT_ADMIN.username,
+        full_name: DEFAULT_ADMIN.fullName,
+        role: "admin",
+        must_change_password: false,
+      },
+    });
+    if (error) throw new Error(error.message);
+    user = data.user;
+  } else {
+    const updatePayload: any = {
+      email_confirm: true,
+      user_metadata: {
+        ...(user.user_metadata ?? {}),
+        username: DEFAULT_ADMIN.username,
+        full_name: DEFAULT_ADMIN.fullName,
+        role: "admin",
+        must_change_password: false,
+      },
+    };
+    if (options.resetPassword) updatePayload.password = DEFAULT_ADMIN.password;
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user.id, updatePayload);
+    if (error) throw new Error(error.message);
+    user = data.user ?? user;
+  }
+
+  if (!user?.id) throw new Error("Falha ao localizar o usuário administrador.");
+  await ensureAdminRows(supabaseAdmin, user.id, false);
+  await supabaseAdmin.from("audit_log").insert({
+    event: options.event,
+    username: DEFAULT_ADMIN.username,
+    user_id: user.id,
+    detail: options.detail,
+  });
+  return { ok: true, userId: user.id, email: DEFAULT_ADMIN.email };
 }
 
 async function assertAdmin(supabase: any, userId: string) {
@@ -28,39 +147,36 @@ async function assertAdmin(supabase: any, userId: string) {
  */
 export const ensureAdminSeed = createServerFn({ method: "POST" }).handler(async () => {
   const supabaseAdmin = await loadAdmin();
+  const existingAdmin = await findAuthUserByEmail(supabaseAdmin, DEFAULT_ADMIN.email);
+  if (existingAdmin?.id) {
+    const passwordOk = await adminPasswordWorks();
+    if (!passwordOk) {
+      return restoreDefaultAdmin({
+        resetPassword: true,
+        event: "ADMIN_RESET",
+        detail: "Senha do administrador padrão corrigida automaticamente para admin123.",
+      });
+    }
+    await ensureAdminRows(supabaseAdmin, existingAdmin.id, false);
+    return { seeded: false, userId: existingAdmin.id };
+  }
+
   const { count, error: cErr } = await supabaseAdmin
     .from("user_roles")
     .select("*", { count: "exact", head: true })
     .eq("role", "admin");
   if (cErr) throw new Error(cErr.message);
-  if ((count ?? 0) > 0) return { seeded: false };
-
-  const email = usernameToEmail("admin");
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: "admin123",
-    email_confirm: true,
-    user_metadata: {
-      username: "admin",
-      full_name: "Administrador",
-      role: "admin",
-      must_change_password: true,
-    },
+  if ((count ?? 0) > 0) return restoreDefaultAdmin({
+    resetPassword: true,
+    event: "ADMIN_RESTORE",
+    detail: "Administrador padrão criado porque não existia em Auth.",
   });
-  if (error) {
-    // Provavelmente o usuário já existe sem role; tente garantir o role
-    const { data: list } = await supabaseAdmin.auth.admin.listUsers();
-    const existing = list?.users.find((u) => u.email === email);
-    if (existing) {
-      await supabaseAdmin
-        .from("user_roles")
-        .upsert({ user_id: existing.id, role: "admin" }, { onConflict: "user_id,role" });
-      return { seeded: true };
-    }
-    throw new Error(error.message);
-  }
-  // Trigger handle_new_user já criou profile + role conforme metadata.
-  return { seeded: true, userId: data.user?.id };
+
+  return restoreDefaultAdmin({
+    resetPassword: true,
+    event: "ADMIN_SEED",
+    detail: "Administrador inicial criado com credenciais padrão.",
+  });
 });
 
 export const adminCreateUser = createServerFn({ method: "POST" })
@@ -156,31 +272,34 @@ export const adminSetActive = createServerFn({ method: "POST" })
  * recovery path when no administrator can access the system.
  */
 export const resetAdminPassword = createServerFn({ method: "POST" }).handler(async () => {
-  const supabaseAdmin = await loadAdmin();
-  const email = usernameToEmail("admin");
-  const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
-  if (listErr) throw new Error(listErr.message);
-  const target = list?.users.find((u) => u.email === email);
-  if (!target) throw new Error("Usuário admin não encontrado.");
-  const { error: pErr } = await supabaseAdmin.auth.admin.updateUserById(target.id, {
-    password: "admin123",
-  });
-  if (pErr) throw new Error(pErr.message);
-  await supabaseAdmin
-    .from("profiles")
-    .update({ active: true, must_change_password: true })
-    .eq("id", target.id);
-  await supabaseAdmin
-    .from("user_roles")
-    .upsert({ user_id: target.id, role: "admin" }, { onConflict: "user_id,role" });
-  await supabaseAdmin.from("audit_log").insert({
+  return restoreDefaultAdmin({
+    resetPassword: true,
     event: "ADMIN_RESET",
-    username: "admin",
-    user_id: target.id,
-    detail: "Senha do administrador redefinida para padrão (admin123).",
+    detail: "Acesso do administrador restaurado para admin/admin123.",
   });
-  return { ok: true };
 });
+
+export const getLoginIdentityStatus = createServerFn({ method: "POST" })
+  .inputValidator((input: { username: string }) => input)
+  .handler(async ({ data }) => {
+    const username = data.username.trim().toLowerCase();
+    if (!username) return { exists: false, active: false, hasRole: false };
+    const supabaseAdmin = await loadAdmin();
+    const user = await findAuthUserByEmail(supabaseAdmin, usernameToEmail(username));
+    if (!user?.id) return { exists: false, active: false, hasRole: false };
+    const [{ data: profile, error: profileErr }, { data: roles, error: roleErr }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("active, username").eq("id", user.id).maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
+    ]);
+    if (profileErr) throw new Error(`Falha ao buscar profile: ${profileErr.message}`);
+    if (roleErr) throw new Error(`Falha ao buscar role: ${roleErr.message}`);
+    return {
+      exists: true,
+      active: profile?.active !== false,
+      hasRole: (roles ?? []).length > 0,
+      username: profile?.username ?? username,
+    };
+  });
 
 /**
  * Logs an unauthenticated login failure. Uses the admin client to bypass

@@ -7,6 +7,7 @@ import {
   adminSetActive,
   resetAdminPassword,
   logLoginFail,
+  getLoginIdentityStatus,
 } from "@/lib/admin.functions";
 
 export type Role = "admin" | "user";
@@ -198,6 +199,7 @@ export const auth = {
       await ensureAdminSeed();
     } catch (err) {
       console.error("ensureAdminSeed", err);
+      throw err;
     }
   },
 
@@ -213,28 +215,60 @@ export const auth = {
   async login(
     username: string,
     password: string,
-  ): Promise<{ ok: true } | { ok: false; error: "missing" | "not_found" | "inactive" | "bad_password" }> {
+  ): Promise<{ ok: true } | { ok: false; error: "missing" | "not_found" | "inactive" | "bad_password" | "profile_error" | "role_error" | "seed_error" | "auth_error" }> {
     const u = username.trim();
     if (!u || !password) return { ok: false, error: "missing" };
     const email = usernameToEmail(u);
+    if (u.toLowerCase() === "admin") {
+      try {
+        await ensureAdminSeed();
+      } catch (err) {
+        console.error("Falha ao criar/restaurar admin antes do login", err);
+        return { ok: false, error: "seed_error" };
+      }
+    }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
+      console.error("Falha técnica de autenticação", { username: u, email, error });
       try {
         await logLoginFail({ data: { username: u, device: device(), detail: error?.message } });
       } catch {
         // ignore
       }
-      const msg = (error?.message ?? "").toLowerCase();
-      if (msg.includes("invalid")) return { ok: false, error: "bad_password" };
-      return { ok: false, error: "not_found" };
+      try {
+        const status = await getLoginIdentityStatus({ data: { username: u } });
+        if (!status.exists) return { ok: false, error: "not_found" };
+        if (!status.active) return { ok: false, error: "inactive" };
+        if (!status.hasRole) return { ok: false, error: "role_error" };
+      } catch (statusErr: any) {
+        console.error("Falha ao diagnosticar login", statusErr);
+        const detail = String(statusErr?.message ?? "").toLowerCase();
+        if (detail.includes("profile")) return { ok: false, error: "profile_error" };
+        if (detail.includes("role")) return { ok: false, error: "role_error" };
+        return { ok: false, error: "auth_error" };
+      }
+      return { ok: false, error: "bad_password" };
     }
     // Verify profile is active
-    const { data: profile } = await supabase
+    const [{ data: profile, error: profileErr }, { data: roleRow, error: roleErr }] = await Promise.all([
+      supabase
       .from("profiles")
       .select("active, username")
       .eq("id", data.user.id)
-      .maybeSingle();
-    if (profile && profile.active === false) {
+      .maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
+    ]);
+    if (profileErr || !profile) {
+      console.error("Falha ao buscar profile após login", profileErr);
+      await supabase.auth.signOut();
+      return { ok: false, error: "profile_error" };
+    }
+    if (roleErr || !roleRow) {
+      console.error("Falha ao buscar role após login", roleErr);
+      await supabase.auth.signOut();
+      return { ok: false, error: "role_error" };
+    }
+    if (profile.active === false) {
       await supabase.auth.signOut();
       return { ok: false, error: "inactive" };
     }
