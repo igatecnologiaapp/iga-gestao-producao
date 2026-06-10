@@ -16,7 +16,14 @@ export const Route = createFileRoute("/materias-primas")({
   component: MateriasPrimasPage,
 });
 
-const emptyForm = { name: "", unit: "kg" as Unit, purchasePrice: "", purchaseQty: "" };
+const emptyForm = {
+  name: "",
+  unit: "" as Unit | "",
+  purchasePrice: "",
+  purchaseQty: "",
+  category: "",
+  notes: "",
+};
 
 function MateriasPrimasPage() {
   const { materials } = useDB();
@@ -35,9 +42,11 @@ function MateriasPrimasPage() {
     setEditing(m);
     setForm({
       name: m.name,
-      unit: m.unit,
-      purchasePrice: String(m.purchasePrice).replace(".", ","),
-      purchaseQty: String(m.purchaseQty).replace(".", ","),
+      unit: m.unit ?? "",
+      purchasePrice: m.purchasePrice == null ? "" : String(m.purchasePrice).replace(".", ","),
+      purchaseQty: m.purchaseQty == null ? "" : String(m.purchaseQty).replace(".", ","),
+      category: m.category ?? "",
+      notes: m.notes ?? "",
     });
     setError("");
     setOpen(true);
@@ -49,15 +58,28 @@ function MateriasPrimasPage() {
 
   function save() {
     const name = form.name.trim();
-    const price = parseNum(form.purchasePrice);
-    const qty = parseNum(form.purchaseQty);
     if (!name) return setError("Informe o nome da matéria-prima.");
-    if (!isFinite(price) || price <= 0) return setError("Valor de compra inválido.");
-    if (!isFinite(qty) || qty <= 0) return setError("Quantidade comprada inválida.");
+    const priceRaw = form.purchasePrice.trim();
+    const qtyRaw = form.purchaseQty.trim();
+    const price = priceRaw === "" ? null : parseNum(priceRaw);
+    const qty = qtyRaw === "" ? null : parseNum(qtyRaw);
+    if (price !== null && (!isFinite(price) || price < 0))
+      return setError("Valor de compra inválido.");
+    if (qty !== null && (!isFinite(qty) || qty < 0))
+      return setError("Quantidade comprada inválida.");
+    const unit: Unit | null = form.unit === "" ? null : (form.unit as Unit);
+    const payload = {
+      name,
+      unit,
+      purchasePrice: price,
+      purchaseQty: qty,
+      category: form.category.trim() || null,
+      notes: form.notes.trim() || null,
+    };
     if (editing) {
-      db.updateMaterial(editing.id, { name, unit: form.unit, purchasePrice: price, purchaseQty: qty });
+      db.updateMaterial(editing.id, payload);
     } else {
-      db.addMaterial({ name, unit: form.unit, purchasePrice: price, purchaseQty: qty });
+      db.addMaterial(payload);
     }
     setOpen(false);
   }
@@ -69,6 +91,7 @@ function MateriasPrimasPage() {
   }
 
   const previewUnit = (() => {
+    if (!form.purchasePrice.trim() || !form.purchaseQty.trim()) return null;
     const price = parseNum(form.purchasePrice);
     const qty = parseNum(form.purchaseQty);
     if (!isFinite(price) || !isFinite(qty) || qty <= 0) return null;
@@ -95,12 +118,23 @@ function MateriasPrimasPage() {
               <div className="min-w-0">
                 <div className="truncate font-semibold text-foreground">{m.name}</div>
                 <div className="text-xs text-muted-foreground">
-                  {m.purchaseQty.toLocaleString("pt-BR")} {m.unit} · {formatBRL(m.purchasePrice)}
+                  {m.purchaseQty != null && m.unit
+                    ? `${m.purchaseQty.toLocaleString("pt-BR")} ${m.unit}`
+                    : "Quantidade não informada"}
+                  {" · "}
+                  {m.purchasePrice != null ? formatBRL(m.purchasePrice) : "Valor não informado"}
                 </div>
               </div>
               <div className="shrink-0 text-right">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Unitário</div>
-                <div className="font-bold text-primary">{formatBRL(unitCost(m))}<span className="text-xs text-muted-foreground font-normal"> /{m.unit}</span></div>
+                <div className="font-bold text-primary">
+                  {m.purchasePrice != null && m.purchaseQty
+                    ? formatBRL(unitCost(m))
+                    : "—"}
+                  {m.unit && (
+                    <span className="text-xs text-muted-foreground font-normal"> /{m.unit}</span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="mt-3 flex gap-2">
@@ -138,11 +172,12 @@ function MateriasPrimasPage() {
                   value={form.unit}
                   onChange={(e) => setForm({ ...form, unit: e.target.value as Unit })}
                 >
+                  <option value="">— Não informada —</option>
                   {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                 </select>
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Valor de compra (R$)">
+                <Field label="Valor de compra (R$) — opcional">
                   <input
                     className="input"
                     inputMode="decimal"
@@ -151,7 +186,7 @@ function MateriasPrimasPage() {
                     onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
                   />
                 </Field>
-                <Field label={`Quantidade (${form.unit})`}>
+                <Field label={`Quantidade${form.unit ? ` (${form.unit})` : ""} — opcional`}>
                   <input
                     className="input"
                     inputMode="decimal"
@@ -161,10 +196,28 @@ function MateriasPrimasPage() {
                   />
                 </Field>
               </div>
+              <Field label="Categoria — opcional">
+                <input
+                  className="input"
+                  placeholder="Ex.: Secos, Laticínios"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                />
+              </Field>
+              <Field label="Observações — opcional">
+                <textarea
+                  className="input min-h-[72px]"
+                  placeholder="Notas internas"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </Field>
               {previewUnit !== null && (
                 <div className="rounded-xl bg-accent/40 p-3 text-center">
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Custo unitário</div>
-                  <div className="text-lg font-bold text-primary">{formatBRL(previewUnit)} /{form.unit}</div>
+                  <div className="text-lg font-bold text-primary">
+                    {formatBRL(previewUnit)}{form.unit ? ` /${form.unit}` : ""}
+                  </div>
                 </div>
               )}
               {error && <p className="text-sm text-destructive">{error}</p>}
