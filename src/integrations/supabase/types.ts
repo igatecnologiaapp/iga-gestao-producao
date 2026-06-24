@@ -44,12 +44,55 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_settings: {
+        Row: {
+          enabled: boolean
+          frequency: string
+          hour_utc: number
+          id: number
+          last_run_at: string | null
+          last_status: string | null
+          retention_count: number
+          retention_days: number
+          updated_at: string
+          updated_by: string | null
+          weekday: number
+        }
+        Insert: {
+          enabled?: boolean
+          frequency?: string
+          hour_utc?: number
+          id?: number
+          last_run_at?: string | null
+          last_status?: string | null
+          retention_count?: number
+          retention_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          weekday?: number
+        }
+        Update: {
+          enabled?: boolean
+          frequency?: string
+          hour_utc?: number
+          id?: number
+          last_run_at?: string | null
+          last_status?: string | null
+          retention_count?: number
+          retention_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          weekday?: number
+        }
+        Relationships: []
+      }
       backups: {
         Row: {
           created_at: string
           created_by: string | null
           created_by_username: string | null
           id: string
+          is_auto: boolean
           label: string
           materials_count: number
           payload: Json
@@ -62,6 +105,7 @@ export type Database = {
           created_by?: string | null
           created_by_username?: string | null
           id?: string
+          is_auto?: boolean
           label: string
           materials_count?: number
           payload: Json
@@ -74,6 +118,7 @@ export type Database = {
           created_by?: string | null
           created_by_username?: string | null
           id?: string
+          is_auto?: boolean
           label?: string
           materials_count?: number
           payload?: Json
