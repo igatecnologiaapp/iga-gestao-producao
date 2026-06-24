@@ -34,7 +34,9 @@ export type AuditEvent =
   | "BACKUP_CREATE"
   | "BACKUP_DOWNLOAD"
   | "BACKUP_RESTORE"
-  | "BACKUP_DELETE";
+  | "BACKUP_DELETE"
+  | "BACKUP_SCHEDULE_UPDATE"
+  | "BACKUP_AUTO_RUN";
 
 export interface AuditEntry {
   id: string;
