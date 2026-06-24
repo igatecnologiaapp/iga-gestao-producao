@@ -13,6 +13,9 @@ import {
   getBackupPayload,
   deleteBackup,
   restoreBackup,
+  getBackupSettings,
+  updateBackupSettings,
+  runAutoBackupNow,
 } from "@/lib/backup.functions";
 
 export const Route = createFileRoute("/backup")({
@@ -30,6 +33,19 @@ type BackupRow = {
   created_by_username: string | null;
   created_at: string;
 };
+
+type ScheduleSettings = {
+  enabled: boolean;
+  frequency: "daily" | "weekly";
+  weekday: number;
+  hour_utc: number;
+  retention_count: number;
+  retention_days: number;
+  last_run_at: string | null;
+  last_status: string | null;
+};
+
+const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -61,6 +77,9 @@ function BackupPage() {
   const getFn = useServerFn(getBackupPayload);
   const deleteFn = useServerFn(deleteBackup);
   const restoreFn = useServerFn(restoreBackup);
+  const getSettingsFn = useServerFn(getBackupSettings);
+  const saveSettingsFn = useServerFn(updateBackupSettings);
+  const runNowFn = useServerFn(runAutoBackupNow);
 
   const [items, setItems] = useState<BackupRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,13 +87,15 @@ function BackupPage() {
   const [label, setLabel] = useState("");
   const [message, setMessage] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const [settings, setSettings] = useState<ScheduleSettings | null>(null);
 
   async function reload() {
     if (!isAdmin) return;
     setLoading(true);
     try {
-      const data = (await listFn()) as BackupRow[];
-      setItems(data);
+      const [list, sett] = await Promise.all([listFn(), getSettingsFn()]);
+      setItems(list as BackupRow[]);
+      if (sett) setSettings(sett as ScheduleSettings);
     } catch (err: any) {
       setMessage({ tone: "err", text: err?.message ?? "Falha ao carregar histórico." });
     } finally {
@@ -240,6 +261,158 @@ function BackupPage() {
           >
             {message.text}
           </div>
+        )}
+
+        {settings && (
+          <section className="rounded-2xl border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">Backup automático</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Roda no servidor sem ação manual. A retenção remove backups automáticos antigos —
+                  backups manuais nunca são excluídos automaticamente.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={settings.enabled}
+                  onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
+                />
+                Ativado
+              </label>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <label className="text-xs">
+                Frequência
+                <select
+                  className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm"
+                  value={settings.frequency}
+                  onChange={(e) =>
+                    setSettings({ ...settings, frequency: e.target.value as "daily" | "weekly" })
+                  }
+                >
+                  <option value="daily">Diário</option>
+                  <option value="weekly">Semanal</option>
+                </select>
+              </label>
+              {settings.frequency === "weekly" && (
+                <label className="text-xs">
+                  Dia da semana
+                  <select
+                    className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm"
+                    value={settings.weekday}
+                    onChange={(e) => setSettings({ ...settings, weekday: Number(e.target.value) })}
+                  >
+                    {WEEKDAYS.map((d, i) => (
+                      <option key={i} value={i}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label className="text-xs">
+                Hora (UTC)
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={settings.hour_utc}
+                  onChange={(e) => setSettings({ ...settings, hour_utc: Number(e.target.value) })}
+                />
+              </label>
+              <label className="text-xs">
+                Reter (qtd.)
+                <Input
+                  type="number"
+                  min={1}
+                  value={settings.retention_count}
+                  onChange={(e) =>
+                    setSettings({ ...settings, retention_count: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label className="text-xs">
+                Reter (dias)
+                <Input
+                  type="number"
+                  min={1}
+                  value={settings.retention_days}
+                  onChange={(e) =>
+                    setSettings({ ...settings, retention_days: Number(e.target.value) })
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  setBusy("save-sched");
+                  setMessage(null);
+                  try {
+                    await saveSettingsFn({
+                      data: {
+                        enabled: settings.enabled,
+                        frequency: settings.frequency,
+                        weekday: settings.weekday,
+                        hour_utc: settings.hour_utc,
+                        retention_count: settings.retention_count,
+                        retention_days: settings.retention_days,
+                      },
+                    });
+                    setMessage({ tone: "ok", text: "Agendamento salvo." });
+                  } catch (err: any) {
+                    setMessage({ tone: "err", text: err?.message ?? "Falha ao salvar." });
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+                disabled={busy === "save-sched"}
+              >
+                {busy === "save-sched" ? "Salvando…" : "Salvar agendamento"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  setBusy("run-now");
+                  setMessage(null);
+                  try {
+                    const res = (await runNowFn()) as {
+                      ran: boolean;
+                      counts?: { materials: number; products: number; sheet_items: number };
+                      removed?: number;
+                    };
+                    setMessage(
+                      res.ran
+                        ? {
+                            tone: "ok",
+                            text: `Backup automático gerado (${res.counts?.materials} matérias, ${res.counts?.products} produtos, ${res.counts?.sheet_items} itens). Removidos: ${res.removed ?? 0}.`,
+                          }
+                        : { tone: "err", text: "Não executou." },
+                    );
+                    await reload();
+                  } catch (err: any) {
+                    setMessage({ tone: "err", text: err?.message ?? "Falha ao executar." });
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+                disabled={busy === "run-now"}
+              >
+                {busy === "run-now" ? "Executando…" : "Executar agora"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Última execução:{" "}
+                {settings.last_run_at ? formatDate(settings.last_run_at) : "—"}
+                {settings.last_status ? ` · ${settings.last_status}` : ""}
+              </span>
+            </div>
+          </section>
         )}
 
         <section className="rounded-2xl border border-border bg-card p-4">

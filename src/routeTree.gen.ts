@@ -22,6 +22,7 @@ import { Route as AlterarSenhaRouteImport } from './routes/alterar-senha'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
 import { Route as FichaIdRouteImport } from './routes/ficha.$id'
+import { Route as ApiPublicHooksAutoBackupRouteImport } from './routes/api/public/hooks/auto-backup'
 
 const UsuariosRoute = UsuariosRouteImport.update({
   id: '/usuarios',
@@ -88,6 +89,12 @@ const FichaIdRoute = FichaIdRouteImport.update({
   path: '/ficha/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksAutoBackupRoute =
+  ApiPublicHooksAutoBackupRouteImport.update({
+    id: '/api/public/hooks/auto-backup',
+    path: '/api/public/hooks/auto-backup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/hooks/auto-backup': typeof ApiPublicHooksAutoBackupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -118,6 +126,7 @@ export interface FileRoutesByTo {
   '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/hooks/auto-backup': typeof ApiPublicHooksAutoBackupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,6 +143,7 @@ export interface FileRoutesById {
   '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
+  '/api/public/hooks/auto-backup': typeof ApiPublicHooksAutoBackupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
+    | '/api/public/hooks/auto-backup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
+    | '/api/public/hooks/auto-backup'
   id:
     | '__root__'
     | '/'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
+    | '/api/public/hooks/auto-backup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,6 +210,7 @@ export interface RootRouteChildren {
   UsuariosRoute: typeof UsuariosRoute
   FichaIdRoute: typeof FichaIdRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
+  ApiPublicHooksAutoBackupRoute: typeof ApiPublicHooksAutoBackupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -292,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FichaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/auto-backup': {
+      id: '/api/public/hooks/auto-backup'
+      path: '/api/public/hooks/auto-backup'
+      fullPath: '/api/public/hooks/auto-backup'
+      preLoaderRoute: typeof ApiPublicHooksAutoBackupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -309,6 +330,7 @@ const rootRouteChildren: RootRouteChildren = {
   UsuariosRoute: UsuariosRoute,
   FichaIdRoute: FichaIdRoute,
   ProdutoIdRoute: ProdutoIdRoute,
+  ApiPublicHooksAutoBackupRoute: ApiPublicHooksAutoBackupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
