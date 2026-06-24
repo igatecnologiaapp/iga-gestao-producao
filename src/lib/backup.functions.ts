@@ -98,6 +98,15 @@ export const updateBackupSettings = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const runAutoBackupNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await loadAdmin();
+    const { runAutoBackup } = await import("@/lib/backup-runner.server");
+    return runAutoBackup(supabaseAdmin, { force: true, trigger: `manual:${context.userId.slice(0, 8)}` });
+  });
+
 export const createBackup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { label?: string }) => input ?? {})
