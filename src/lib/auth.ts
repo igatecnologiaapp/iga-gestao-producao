@@ -30,7 +30,11 @@ export type AuditEvent =
   | "USER_CREATE"
   | "USER_UPDATE"
   | "USER_ACTIVATE"
-  | "USER_DEACTIVATE";
+  | "USER_DEACTIVATE"
+  | "BACKUP_CREATE"
+  | "BACKUP_DOWNLOAD"
+  | "BACKUP_RESTORE"
+  | "BACKUP_DELETE";
 
 export interface AuditEntry {
   id: string;

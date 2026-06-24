@@ -44,6 +44,45 @@ export type Database = {
         }
         Relationships: []
       }
+      backups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_username: string | null
+          id: string
+          label: string
+          materials_count: number
+          payload: Json
+          products_count: number
+          sheet_items_count: number
+          size_bytes: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_username?: string | null
+          id?: string
+          label: string
+          materials_count?: number
+          payload: Json
+          products_count?: number
+          sheet_items_count?: number
+          size_bytes?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_username?: string | null
+          id?: string
+          label?: string
+          materials_count?: number
+          payload?: Json
+          products_count?: number
+          sheet_items_count?: number
+          size_bytes?: number
+        }
+        Relationships: []
+      }
       materials: {
         Row: {
           category: string | null
