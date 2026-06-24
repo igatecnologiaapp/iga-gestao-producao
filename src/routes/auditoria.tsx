@@ -20,6 +20,8 @@ const labels: Record<AuditEvent, string> = {
   BACKUP_DOWNLOAD: "Backup baixado",
   BACKUP_RESTORE: "Backup restaurado",
   BACKUP_DELETE: "Backup excluído",
+  BACKUP_SCHEDULE_UPDATE: "Agendamento de backup",
+  BACKUP_AUTO_RUN: "Backup automático executado",
 };
 
 const tones: Record<AuditEvent, string> = {
@@ -35,6 +37,8 @@ const tones: Record<AuditEvent, string> = {
   BACKUP_DOWNLOAD: "bg-muted text-muted-foreground",
   BACKUP_RESTORE: "bg-amber-100 text-amber-800",
   BACKUP_DELETE: "bg-destructive/10 text-destructive",
+  BACKUP_SCHEDULE_UPDATE: "bg-primary/10 text-primary",
+  BACKUP_AUTO_RUN: "bg-emerald-100 text-emerald-700",
 };
 
 function AuditoriaPage() {
