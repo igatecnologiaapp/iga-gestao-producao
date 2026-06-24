@@ -44,6 +44,60 @@ async function buildSnapshot(supabaseAdmin: any) {
   };
 }
 
+export const getBackupSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await loadAdmin();
+    const { data, error } = await supabaseAdmin
+      .from("backup_settings")
+      .select("*")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  });
+
+export const updateBackupSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      enabled: boolean;
+      frequency: "daily" | "weekly";
+      weekday: number;
+      hour_utc: number;
+      retention_count: number;
+      retention_days: number;
+    }) => input,
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await loadAdmin();
+    const username = await resolveUsername(supabaseAdmin, context.userId);
+    const payload = {
+      id: 1,
+      enabled: !!data.enabled,
+      frequency: data.frequency === "weekly" ? "weekly" : "daily",
+      weekday: Math.min(6, Math.max(0, Math.floor(data.weekday))),
+      hour_utc: Math.min(23, Math.max(0, Math.floor(data.hour_utc))),
+      retention_count: Math.max(1, Math.floor(data.retention_count)),
+      retention_days: Math.max(1, Math.floor(data.retention_days)),
+      updated_at: new Date().toISOString(),
+      updated_by: context.userId,
+    };
+    const { error } = await supabaseAdmin
+      .from("backup_settings")
+      .upsert(payload, { onConflict: "id" });
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("audit_log").insert({
+      event: "BACKUP_SCHEDULE_UPDATE",
+      username,
+      user_id: context.userId,
+      detail: `enabled=${payload.enabled} freq=${payload.frequency} weekday=${payload.weekday} hour=${payload.hour_utc}UTC retention=${payload.retention_count}/${payload.retention_days}d`,
+    });
+    return { ok: true };
+  });
+
 export const createBackup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { label?: string }) => input ?? {})
