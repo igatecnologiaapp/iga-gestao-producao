@@ -16,6 +16,10 @@ const labels: Record<AuditEvent, string> = {
   USER_UPDATE: "Edição de usuário",
   USER_ACTIVATE: "Usuário ativado",
   USER_DEACTIVATE: "Usuário desativado",
+  BACKUP_CREATE: "Backup criado",
+  BACKUP_DOWNLOAD: "Backup baixado",
+  BACKUP_RESTORE: "Backup restaurado",
+  BACKUP_DELETE: "Backup excluído",
 };
 
 const tones: Record<AuditEvent, string> = {
@@ -27,6 +31,10 @@ const tones: Record<AuditEvent, string> = {
   USER_UPDATE: "bg-primary/10 text-primary",
   USER_ACTIVATE: "bg-emerald-100 text-emerald-700",
   USER_DEACTIVATE: "bg-destructive/10 text-destructive",
+  BACKUP_CREATE: "bg-primary/10 text-primary",
+  BACKUP_DOWNLOAD: "bg-muted text-muted-foreground",
+  BACKUP_RESTORE: "bg-amber-100 text-amber-800",
+  BACKUP_DELETE: "bg-destructive/10 text-destructive",
 };
 
 function AuditoriaPage() {
