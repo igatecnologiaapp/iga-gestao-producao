@@ -16,6 +16,7 @@ import { Route as MateriasPrimasRouteImport } from './routes/materias-primas'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FichasRouteImport } from './routes/fichas'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as BackupRouteImport } from './routes/backup'
 import { Route as AuditoriaRouteImport } from './routes/auditoria'
 import { Route as AlterarSenhaRouteImport } from './routes/alterar-senha'
 import { Route as IndexRouteImport } from './routes/index'
@@ -57,6 +58,11 @@ const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
   path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BackupRoute = BackupRouteImport.update({
+  id: '/backup',
+  path: '/backup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuditoriaRoute = AuditoriaRouteImport.update({
   id: '/auditoria',
   path: '/auditoria',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alterar-senha': typeof AlterarSenhaRoute
   '/auditoria': typeof AuditoriaRoute
+  '/backup': typeof BackupRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/fichas': typeof FichasRoute
   '/login': typeof LoginRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alterar-senha': typeof AlterarSenhaRoute
   '/auditoria': typeof AuditoriaRoute
+  '/backup': typeof BackupRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/fichas': typeof FichasRoute
   '/login': typeof LoginRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alterar-senha': typeof AlterarSenhaRoute
   '/auditoria': typeof AuditoriaRoute
+  '/backup': typeof BackupRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/fichas': typeof FichasRoute
   '/login': typeof LoginRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alterar-senha'
     | '/auditoria'
+    | '/backup'
     | '/configuracoes'
     | '/fichas'
     | '/login'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alterar-senha'
     | '/auditoria'
+    | '/backup'
     | '/configuracoes'
     | '/fichas'
     | '/login'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alterar-senha'
     | '/auditoria'
+    | '/backup'
     | '/configuracoes'
     | '/fichas'
     | '/login'
@@ -175,6 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlterarSenhaRoute: typeof AlterarSenhaRoute
   AuditoriaRoute: typeof AuditoriaRoute
+  BackupRoute: typeof BackupRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   FichasRoute: typeof FichasRoute
   LoginRoute: typeof LoginRoute
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/backup': {
+      id: '/backup'
+      path: '/backup'
+      fullPath: '/backup'
+      preLoaderRoute: typeof BackupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auditoria': {
       id: '/auditoria'
       path: '/auditoria'
@@ -279,6 +299,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlterarSenhaRoute: AlterarSenhaRoute,
   AuditoriaRoute: AuditoriaRoute,
+  BackupRoute: BackupRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   FichasRoute: FichasRoute,
   LoginRoute: LoginRoute,
