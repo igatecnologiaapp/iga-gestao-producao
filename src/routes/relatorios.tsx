@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { useDB, productCost, formatBRL, formatBRLOrEmpty } from "@/lib/store";
+import { exportGeneralReport, exportMaterialsReport } from "@/lib/pdf-reports";
 
 export const Route = createFileRoute("/relatorios")({
   head: () => ({ meta: [{ title: "Relatórios — FichaTec" }] }),
@@ -28,6 +29,21 @@ function RelatoriosPage() {
   return (
     <div className="min-h-screen bg-background pb-12">
       <PageHeader title="Relatórios" subtitle="Custo, lucro e margem" />
+
+      <div className="mx-4 mt-4 flex flex-col gap-2 sm:flex-row">
+        <button
+          onClick={() => exportGeneralReport(products, materials)}
+          className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm active:scale-95"
+        >
+          📄 Exportar Relatório Geral
+        </button>
+        <button
+          onClick={() => exportMaterialsReport(materials)}
+          className="flex-1 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground shadow-sm active:scale-95"
+        >
+          📦 Exportar Matérias-Primas
+        </button>
+      </div>
 
       <section className="mx-4 mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="grid grid-cols-2 gap-3">

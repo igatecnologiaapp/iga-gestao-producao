@@ -10,6 +10,7 @@ import {
   formatQty,
   type SheetItem,
 } from "@/lib/store";
+import { exportProductSheet } from "@/lib/pdf-reports";
 
 export const Route = createFileRoute("/ficha/$id")({
   head: () => ({ meta: [{ title: "Ficha técnica — FichaTec" }] }),
@@ -88,6 +89,15 @@ function FichaPage() {
   return (
     <div className="min-h-screen bg-background pb-28">
       <PageHeader title={product.name} subtitle={`Ficha técnica${product.unit ? ` · por ${product.unit}` : ""}`} backTo="/produtos" />
+
+      <div className="px-4 pt-3">
+        <button
+          onClick={() => exportProductSheet(product, materials)}
+          className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm active:scale-95"
+        >
+          📄 Exportar Ficha Técnica (PDF)
+        </button>
+      </div>
 
       <section className="mx-4 mt-4 rounded-2xl bg-card border border-border p-4 shadow-sm">
         <div className="grid grid-cols-2 gap-3">

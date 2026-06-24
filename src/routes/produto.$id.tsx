@@ -10,6 +10,7 @@ import {
   missingProductFields,
   productStatus,
 } from "@/lib/store";
+import { exportProductSheet } from "@/lib/pdf-reports";
 
 export const Route = createFileRoute("/produto/$id")({
   head: () => ({ meta: [{ title: "Detalhes do produto — FichaTec" }] }),
@@ -42,6 +43,15 @@ function ProdutoDetalhe() {
   return (
     <div className="min-h-screen bg-background pb-12">
       <PageHeader title={product.name} subtitle={product.unit ? `por ${product.unit}` : "unidade não informada"} backTo="/produtos" />
+
+      <div className="px-4 pt-3">
+        <button
+          onClick={() => exportProductSheet(product, materials)}
+          className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm active:scale-95"
+        >
+          📄 Exportar Ficha Técnica (PDF)
+        </button>
+      </div>
 
       {missing.length > 0 && (
         <div className="mx-4 mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
