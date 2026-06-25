@@ -35,6 +35,15 @@ function Index() {
     { to: "/relatorios", title: "Relatórios", desc: "Custos, lucro e margem por produto", emoji: "📊" },
   ];
 
+  const adminCards: { to: string; title: string; desc: string; emoji: string }[] = [
+    { to: "/backup", title: "Backup e Segurança", desc: "Criar, restaurar e baixar backups", emoji: "💾" },
+    { to: "/unidades", title: "Unidades de Medida", desc: "kg, g, ml, un e personalizadas", emoji: "📏" },
+    { to: "/usuarios", title: "Usuários e Permissões", desc: "Gerencie acessos do sistema", emoji: "👥" },
+    { to: "/auditoria", title: "Auditoria", desc: "Histórico de acessos e ações", emoji: "🛡️" },
+    { to: "/configuracoes", title: "Configurações", desc: "Preferências e atalhos do sistema", emoji: "⚙️" },
+  ];
+  const isAdmin = session?.role === "admin";
+
   return (
     <div className="min-h-screen bg-background">
       <header className="px-5 pt-6 pb-4">
@@ -71,6 +80,28 @@ function Index() {
             </Link>
           ))}
         </div>
+
+        {isAdmin && (
+          <>
+            <div className="mt-8 mb-3 flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">🛠 Administração</h2>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Admin</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {adminCards.map((c) => (
+                <Link
+                  key={c.to}
+                  to={c.to}
+                  className="group rounded-2xl border border-primary/30 bg-primary/5 p-4 shadow-sm transition active:scale-[0.98] hover:border-primary/60"
+                >
+                  <div className="text-3xl">{c.emoji}</div>
+                  <div className="mt-3 text-sm font-semibold text-foreground">{c.title}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground leading-snug">{c.desc}</div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
 
         {products.length > 0 && (
           <>
