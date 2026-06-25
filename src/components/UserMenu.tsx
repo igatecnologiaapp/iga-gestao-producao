@@ -56,11 +56,23 @@ export function UserMenu({ variant = "light" }: { variant?: "light" | "dark" }) 
             </Link>
             {session.role === "admin" && (
               <>
+                <div className="border-t border-border bg-muted/30 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Administração
+                </div>
+                <Link to="/backup" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent">
+                  <span>💾</span> Backup e Segurança
+                </Link>
+                <Link to="/unidades" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent">
+                  <span>📏</span> Unidades de Medida
+                </Link>
                 <Link to="/usuarios" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent">
                   <span>👥</span> Usuários
                 </Link>
                 <Link to="/auditoria" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent">
                   <span>🛡️</span> Auditoria
+                </Link>
+                <Link to="/configuracoes" onClick={() => setOpen(false)} className="flex items-center gap-2 border-t border-border px-4 py-2.5 text-sm hover:bg-accent">
+                  <span>⚙️</span> Configurações
                 </Link>
               </>
             )}
