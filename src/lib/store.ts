@@ -343,3 +343,24 @@ export function formatBRLOrEmpty(n: number | null | undefined): string {
   if (n === null || n === undefined) return "Não informado";
   return formatBRL(n);
 }
+
+export function unitOptionsFor(
+  units: UnitOfMeasure[],
+  currentValue?: string | null,
+): { value: string; label: string; inactive?: boolean }[] {
+  const active = units.filter((u) => u.active);
+  const list = active.map((u) => ({ value: u.abbreviation, label: u.abbreviation }));
+  if (currentValue && currentValue.trim() !== "") {
+    const exists = list.some(
+      (o) => o.value.toLowerCase() === currentValue.toLowerCase(),
+    );
+    if (!exists) {
+      list.push({
+        value: currentValue,
+        label: `${currentValue} (inativa)`,
+        inactive: true,
+      });
+    }
+  }
+  return list;
+}
