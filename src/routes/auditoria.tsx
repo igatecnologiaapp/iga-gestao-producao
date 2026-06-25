@@ -22,6 +22,11 @@ const labels: Record<AuditEvent, string> = {
   BACKUP_DELETE: "Backup excluído",
   BACKUP_SCHEDULE_UPDATE: "Agendamento de backup",
   BACKUP_AUTO_RUN: "Backup automático executado",
+  UNIT_CREATE: "Unidade criada",
+  UNIT_UPDATE: "Unidade editada",
+  UNIT_DEACTIVATE: "Unidade inativada",
+  UNIT_DELETE: "Unidade excluída",
+  UNIT_MIGRATION: "Migração de unidades",
 };
 
 const tones: Record<AuditEvent, string> = {
@@ -39,6 +44,11 @@ const tones: Record<AuditEvent, string> = {
   BACKUP_DELETE: "bg-destructive/10 text-destructive",
   BACKUP_SCHEDULE_UPDATE: "bg-primary/10 text-primary",
   BACKUP_AUTO_RUN: "bg-emerald-100 text-emerald-700",
+  UNIT_CREATE: "bg-primary/10 text-primary",
+  UNIT_UPDATE: "bg-primary/10 text-primary",
+  UNIT_DEACTIVATE: "bg-amber-100 text-amber-800",
+  UNIT_DELETE: "bg-destructive/10 text-destructive",
+  UNIT_MIGRATION: "bg-muted text-muted-foreground",
 };
 
 function AuditoriaPage() {

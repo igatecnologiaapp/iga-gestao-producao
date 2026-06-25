@@ -14,6 +14,7 @@ function ConfiguracoesPage() {
     { to: "/alterar-senha", title: "Alterar senha", desc: "Atualize sua senha de acesso", icon: "🔑", show: true },
     { to: "/usuarios", title: "Usuários", desc: "Gerencie usuários e permissões", icon: "👥", show: isAdmin },
     { to: "/auditoria", title: "Auditoria", desc: "Histórico de acessos e ações", icon: "🛡️", show: isAdmin },
+    { to: "/unidades", title: "Unidades de Medida", desc: "Cadastro de unidades (kg, g, ml, un...)", icon: "📏", show: isAdmin },
     { to: "/backup", title: "Backup e Segurança", desc: "Backup manual, restauração e histórico", icon: "💾", show: isAdmin },
   ];
   return (
