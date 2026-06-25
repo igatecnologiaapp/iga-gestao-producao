@@ -24,8 +24,7 @@ function LoginPage() {
     // Garante criação do admin inicial (idempotente — no-op após primeiro seed)
     auth.ensureAdminSeed()
       .catch((err) => {
-        console.error("Falha ao preparar acesso inicial", err);
-        setErrors({ global: "Falha ao preparar acesso inicial. Use Restaurar acesso do administrador." });
+        console.warn("ensureAdminSeed (boot) falhou", err);
       })
       .finally(() => setSeedReady(true));
   }, []);
@@ -53,10 +52,8 @@ function LoginPage() {
     try {
       await auth.ensureAdminSeed();
     } catch (err) {
-      console.error("Falha no ensureAdminSeed antes do login", err);
-      setLoading(false);
-      setErrors({ global: "Falha ao preparar o administrador inicial. Use Restaurar acesso do administrador." });
-      return;
+      // Não bloqueia o login: o seed é apenas garantia para o primeiro acesso.
+      console.warn("ensureAdminSeed falhou (seguindo com login mesmo assim)", err);
     }
     const res = await auth.login(username, password);
     setLoading(false);

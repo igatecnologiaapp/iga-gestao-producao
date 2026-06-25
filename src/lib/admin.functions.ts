@@ -77,11 +77,16 @@ async function ensureAdminRows(supabaseAdmin: any, userId: string, mustChangePas
   );
   if (profileErr) throw new Error(profileErr.message);
 
-  const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+  // Idempotente: remove papéis não-admin e garante o papel admin sem violar UNIQUE(user_id, role).
+  const { error: delErr } = await supabaseAdmin
+    .from("user_roles")
+    .delete()
+    .eq("user_id", userId)
+    .neq("role", "admin");
   if (delErr) throw new Error(delErr.message);
   const { error: roleErr } = await supabaseAdmin
     .from("user_roles")
-    .insert({ user_id: userId, role: "admin" });
+    .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role", ignoreDuplicates: true });
   if (roleErr) throw new Error(roleErr.message);
 }
 
