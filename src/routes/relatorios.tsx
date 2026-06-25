@@ -9,7 +9,7 @@ export const Route = createFileRoute("/relatorios")({
 });
 
 function RelatoriosPage() {
-  const { products, materials } = useDB();
+  const { products, materials, units } = useDB();
 
   const rows = products.map((p) => {
     const cost = productCost(p, materials);
@@ -32,13 +32,13 @@ function RelatoriosPage() {
 
       <div className="mx-4 mt-4 flex flex-col gap-2 sm:flex-row">
         <button
-          onClick={() => exportGeneralReport(products, materials)}
+          onClick={() => exportGeneralReport(products, materials, units)}
           className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm active:scale-95"
         >
           📄 Exportar Relatório Geral
         </button>
         <button
-          onClick={() => exportMaterialsReport(materials)}
+          onClick={() => exportMaterialsReport(materials, units)}
           className="flex-1 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground shadow-sm active:scale-95"
         >
           📦 Exportar Matérias-Primas

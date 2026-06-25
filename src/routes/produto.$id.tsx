@@ -19,7 +19,7 @@ export const Route = createFileRoute("/produto/$id")({
 
 function ProdutoDetalhe() {
   const { id } = Route.useParams();
-  const { products, materials } = useDB();
+  const { products, materials, units } = useDB();
   const product = products.find((p) => p.id === id);
 
   if (!product) {
@@ -46,7 +46,7 @@ function ProdutoDetalhe() {
 
       <div className="px-4 pt-3">
         <button
-          onClick={() => exportProductSheet(product, materials)}
+          onClick={() => exportProductSheet(product, materials, units)}
           className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm active:scale-95"
         >
           📄 Exportar Ficha Técnica (PDF)
