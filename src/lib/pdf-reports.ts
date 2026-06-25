@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import {
   type Material,
   type Product,
+  type UnitOfMeasure,
   unitCost,
   productCost,
   formatBRL,
@@ -20,6 +21,31 @@ function fmtDateTime(d = new Date()): string {
 function orNI(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === "") return "Não informado";
   return String(v);
+}
+
+function formatUnit(
+  abbr: string | null | undefined,
+  units: UnitOfMeasure[] = [],
+): string {
+  if (!abbr || abbr === "") return "Não informado";
+  const match = units.find(
+    (u) => u.abbreviation.toLowerCase() === abbr.toLowerCase(),
+  );
+  if (!match) return `${abbr} (legada)`;
+  const suffix = match.active ? "" : " (inativa)";
+  // "Nome (sigla)" — if name equals abbreviation, just show the abbreviation
+  if (match.name.toLowerCase() === match.abbreviation.toLowerCase()) {
+    return `${match.abbreviation}${suffix}`;
+  }
+  return `${match.name} (${match.abbreviation})${suffix}`;
+}
+
+function formatQtyWithUnit(
+  qty: number,
+  abbr: string | null | undefined,
+): string {
+  const a = abbr && abbr !== "" ? abbr : "";
+  return `${formatQty(qty)}${a ? ` ${a}` : ""}`.trim();
 }
 
 function addHeaderFooter(doc: jsPDF, title: string) {
@@ -79,7 +105,11 @@ function kv(doc: jsPDF, label: string, value: string, x: number, y: number) {
   doc.text(value, x, y + 14);
 }
 
-export function exportGeneralReport(products: Product[], materials: Material[]) {
+export function exportGeneralReport(
+  products: Product[],
+  materials: Material[],
+  units: UnitOfMeasure[] = [],
+) {
   if (products.length === 0) {
     alert("Não há produtos cadastrados para exportar.");
     return;
@@ -122,7 +152,7 @@ export function exportGeneralReport(products: Product[], materials: Material[]) 
     head: [["Produto", "Unid.", "Categoria", "Custo real", "Venda", "Lucro", "Margem %", "Custo/Venda %"]],
     body: rows.map((r) => [
       r.p.name,
-      orNI(r.p.unit),
+      formatUnit(r.p.unit, units),
       orNI(r.p.category ?? null),
       formatBRL(r.cost),
       formatBRLOrEmpty(r.p.salePrice),
@@ -139,7 +169,10 @@ export function exportGeneralReport(products: Product[], materials: Material[]) 
   save(doc, `relatorio-geral-${Date.now()}.pdf`);
 }
 
-export function exportMaterialsReport(materials: Material[]) {
+export function exportMaterialsReport(
+  materials: Material[],
+  units: UnitOfMeasure[] = [],
+) {
   if (materials.length === 0) {
     alert("Não há matérias-primas cadastradas para exportar.");
     return;
@@ -157,10 +190,12 @@ export function exportMaterialsReport(materials: Material[]) {
     head: [["Matéria-prima", "Unid.", "Categoria", "Preço compra", "Qtd. comprada", "Custo unitário", "Observações"]],
     body: materials.map((m) => [
       m.name,
-      orNI(m.unit),
+      formatUnit(m.unit, units),
       orNI(m.category ?? null),
       m.purchasePrice == null ? "Não informado" : formatBRL(m.purchasePrice),
-      m.purchaseQty == null ? "Não informado" : formatQty(m.purchaseQty),
+      m.purchaseQty == null
+        ? "Não informado"
+        : formatQtyWithUnit(m.purchaseQty, m.unit),
       formatBRL(unitCost(m)),
       orNI(m.notes ?? null),
     ]),
@@ -173,7 +208,11 @@ export function exportMaterialsReport(materials: Material[]) {
   save(doc, `materias-primas-${Date.now()}.pdf`);
 }
 
-export function exportProductSheet(product: Product, materials: Material[]) {
+export function exportProductSheet(
+  product: Product,
+  materials: Material[],
+  units: UnitOfMeasure[] = [],
+) {
   const title = "Ficha Técnica do Produto";
   const doc = startDoc(title);
   let y = 80;
@@ -191,7 +230,7 @@ export function exportProductSheet(product: Product, materials: Material[]) {
   doc.setFontSize(10);
   doc.setTextColor(60);
   const info: [string, string][] = [
-    ["Unidade", orNI(product.unit)],
+    ["Unidade", formatUnit(product.unit, units)],
     ["Categoria", orNI(product.category ?? null)],
     ["Código interno", orNI(product.internalCode ?? null)],
     ["Código de barras", orNI(product.barcode ?? null)],
@@ -243,9 +282,9 @@ export function exportProductSheet(product: Product, materials: Material[]) {
         const share = cost > 0 ? (itemCost / cost) * 100 : 0;
         return [
           m.name,
-          orNI(m.unit),
-          `${formatQty(item.quantity)} ${m.unit ?? ""}`.trim(),
-          formatBRL(u),
+          formatUnit(m.unit, units),
+          formatQtyWithUnit(item.quantity, m.unit),
+          `${formatBRL(u)}${m.unit ? ` /${m.unit}` : ""}`,
           formatBRL(itemCost),
           `${share.toFixed(1)}%`,
         ];
