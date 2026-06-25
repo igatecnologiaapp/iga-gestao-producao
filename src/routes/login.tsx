@@ -24,8 +24,7 @@ function LoginPage() {
     // Garante criação do admin inicial (idempotente — no-op após primeiro seed)
     auth.ensureAdminSeed()
       .catch((err) => {
-        console.error("Falha ao preparar acesso inicial", err);
-        setErrors({ global: "Falha ao preparar acesso inicial. Use Restaurar acesso do administrador." });
+        console.warn("ensureAdminSeed (boot) falhou", err);
       })
       .finally(() => setSeedReady(true));
   }, []);
