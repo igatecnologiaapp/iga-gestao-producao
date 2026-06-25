@@ -36,7 +36,12 @@ export type AuditEvent =
   | "BACKUP_RESTORE"
   | "BACKUP_DELETE"
   | "BACKUP_SCHEDULE_UPDATE"
-  | "BACKUP_AUTO_RUN";
+  | "BACKUP_AUTO_RUN"
+  | "UNIT_CREATE"
+  | "UNIT_UPDATE"
+  | "UNIT_DEACTIVATE"
+  | "UNIT_DELETE"
+  | "UNIT_MIGRATION";
 
 export interface AuditEntry {
   id: string;

@@ -4,9 +4,9 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   db,
   useDB,
-  UNITS,
   unitCost,
   formatBRL,
+  unitOptionsFor,
   type Material,
   type Unit,
 } from "@/lib/store";
@@ -26,7 +26,7 @@ const emptyForm = {
 };
 
 function MateriasPrimasPage() {
-  const { materials } = useDB();
+  const { materials, units } = useDB();
   const [editing, setEditing] = useState<Material | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -173,7 +173,9 @@ function MateriasPrimasPage() {
                   onChange={(e) => setForm({ ...form, unit: e.target.value as Unit })}
                 >
                   <option value="">— Não informada —</option>
-                  {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                  {unitOptionsFor(units, form.unit || null).map((u) => (
+                    <option key={u.value} value={u.value}>{u.label}</option>
+                  ))}
                 </select>
               </Field>
               <div className="grid grid-cols-2 gap-3">

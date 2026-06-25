@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 
 async function loadAdmin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -27,20 +27,23 @@ async function resolveUsername(supabaseAdmin: any, userId: string): Promise<stri
 }
 
 async function buildSnapshot(supabaseAdmin: any) {
-  const [matsRes, prodsRes, itemsRes] = await Promise.all([
+  const [matsRes, prodsRes, itemsRes, unitsRes] = await Promise.all([
     supabaseAdmin.from("materials").select("*").order("name"),
     supabaseAdmin.from("products").select("*").order("name"),
     supabaseAdmin.from("sheet_items").select("*"),
+    supabaseAdmin.from("units_of_measure").select("*").order("display_order"),
   ]);
   if (matsRes.error) throw new Error(matsRes.error.message);
   if (prodsRes.error) throw new Error(prodsRes.error.message);
   if (itemsRes.error) throw new Error(itemsRes.error.message);
+  if (unitsRes.error) throw new Error(unitsRes.error.message);
   return {
     version: BACKUP_VERSION,
     generatedAt: new Date().toISOString(),
     materials: matsRes.data ?? [],
     products: prodsRes.data ?? [],
     sheet_items: itemsRes.data ?? [],
+    units_of_measure: unitsRes.data ?? [],
   };
 }
 
@@ -207,6 +210,7 @@ function validateSnapshot(snapshot: any): asserts snapshot is {
   materials: any[];
   products: any[];
   sheet_items: any[];
+  units_of_measure?: any[];
 } {
   if (!snapshot || typeof snapshot !== "object") throw new Error("Arquivo inválido.");
   if (!Array.isArray(snapshot.materials)) throw new Error("Backup sem matérias-primas.");
@@ -274,6 +278,23 @@ export const restoreBackup = createServerFn({ method: "POST" })
     if (snapshot.sheet_items.length) {
       const { error } = await supabaseAdmin.from("sheet_items").insert(snapshot.sheet_items);
       if (error) throw new Error(`Restaurando itens: ${error.message}`);
+    }
+
+    // Restore units (incremental upsert by abbreviation; preserves existing & does not delete)
+    if (Array.isArray(snapshot.units_of_measure) && snapshot.units_of_measure.length) {
+      const rows = snapshot.units_of_measure.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        abbreviation: u.abbreviation,
+        description: u.description ?? null,
+        active: u.active ?? true,
+        display_order: u.display_order ?? 0,
+        created_by: u.created_by ?? context.userId,
+      }));
+      const { error } = await supabaseAdmin
+        .from("units_of_measure")
+        .upsert(rows, { onConflict: "id" });
+      if (error) throw new Error(`Restaurando unidades: ${error.message}`);
     }
 
     await supabaseAdmin.from("audit_log").insert({

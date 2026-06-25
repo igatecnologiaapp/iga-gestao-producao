@@ -299,6 +299,42 @@ export type Database = {
           },
         ]
       }
+      units_of_measure: {
+        Row: {
+          abbreviation: string
+          active: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_order: number
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          abbreviation: string
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          abbreviation?: string
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
