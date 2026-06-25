@@ -24,6 +24,15 @@ export const UNITS: Unit[] = [
   "outra",
 ];
 
+export interface UnitOfMeasure {
+  id: string;
+  name: string;
+  abbreviation: string;
+  description: string | null;
+  active: boolean;
+  displayOrder: number;
+}
+
 export interface Material {
   id: string;
   name: string;
@@ -56,9 +65,10 @@ export interface Product {
 interface DB {
   materials: Material[];
   products: Product[];
+  units: UnitOfMeasure[];
 }
 
-const initial: DB = { materials: [], products: [] };
+const initial: DB = { materials: [], products: [], units: [] };
 
 let state: DB = initial;
 let hydrated = false;
@@ -72,10 +82,15 @@ function setState(next: DB) {
 }
 
 async function loadAll(): Promise<DB> {
-  const [matsRes, prodsRes, itemsRes] = await Promise.all([
+  const [matsRes, prodsRes, itemsRes, unitsRes] = await Promise.all([
     supabase.from("materials").select("*").order("name"),
     supabase.from("products").select("*").order("name"),
     supabase.from("sheet_items").select("*"),
+    supabase
+      .from("units_of_measure")
+      .select("*")
+      .order("display_order")
+      .order("name"),
   ]);
   if (matsRes.error || prodsRes.error || itemsRes.error) {
     return state;
@@ -107,7 +122,15 @@ async function loadAll(): Promise<DB> {
     notes: p.notes ?? null,
     sheet: itemsByProduct.get(p.id) ?? [],
   }));
-  return { materials, products };
+  const units: UnitOfMeasure[] = (unitsRes.data ?? []).map((u: any) => ({
+    id: u.id,
+    name: u.name,
+    abbreviation: u.abbreviation,
+    description: u.description ?? null,
+    active: u.active !== false,
+    displayOrder: Number(u.display_order ?? 0),
+  }));
+  return { materials, products, units };
 }
 
 let reloadScheduled = false;
@@ -127,6 +150,7 @@ function startRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "materials" }, reload)
     .on("postgres_changes", { event: "*", schema: "public", table: "products" }, reload)
     .on("postgres_changes", { event: "*", schema: "public", table: "sheet_items" }, reload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "units_of_measure" }, reload)
     .subscribe();
 }
 
