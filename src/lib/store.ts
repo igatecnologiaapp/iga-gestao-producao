@@ -344,12 +344,18 @@ export function formatBRLOrEmpty(n: number | null | undefined): string {
   return formatBRL(n);
 }
 
+export interface UnitOption {
+  value: string;
+  label: string;
+  inactive?: boolean;
+}
+
 export function unitOptionsFor(
   units: UnitOfMeasure[],
   currentValue?: string | null,
-): { value: string; label: string; inactive?: boolean }[] {
+): UnitOption[] {
   const active = units.filter((u) => u.active);
-  const list = active.map((u) => ({ value: u.abbreviation, label: u.abbreviation }));
+  const list: UnitOption[] = active.map((u) => ({ value: u.abbreviation, label: u.abbreviation }));
   if (currentValue && currentValue.trim() !== "") {
     const exists = list.some(
       (o) => o.value.toLowerCase() === currentValue.toLowerCase(),
