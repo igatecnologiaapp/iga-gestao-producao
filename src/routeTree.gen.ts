@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
+import { Route as UnidadesRouteImport } from './routes/unidades'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as ProdutosRouteImport } from './routes/produtos'
 import { Route as MateriasPrimasRouteImport } from './routes/materias-primas'
@@ -27,6 +28,11 @@ import { Route as ApiPublicHooksAutoBackupRouteImport } from './routes/api/publi
 const UsuariosRoute = UsuariosRouteImport.update({
   id: '/usuarios',
   path: '/usuarios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UnidadesRoute = UnidadesRouteImport.update({
+  id: '/unidades',
+  path: '/unidades',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RelatoriosRoute = RelatoriosRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/materias-primas': typeof MateriasPrimasRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
+  '/unidades': typeof UnidadesRoute
   '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/materias-primas': typeof MateriasPrimasRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
+  '/unidades': typeof UnidadesRoute
   '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/materias-primas': typeof MateriasPrimasRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
+  '/unidades': typeof UnidadesRoute
   '/usuarios': typeof UsuariosRoute
   '/ficha/$id': typeof FichaIdRoute
   '/produto/$id': typeof ProdutoIdRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/materias-primas'
     | '/produtos'
     | '/relatorios'
+    | '/unidades'
     | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/materias-primas'
     | '/produtos'
     | '/relatorios'
+    | '/unidades'
     | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/materias-primas'
     | '/produtos'
     | '/relatorios'
+    | '/unidades'
     | '/usuarios'
     | '/ficha/$id'
     | '/produto/$id'
@@ -207,6 +219,7 @@ export interface RootRouteChildren {
   MateriasPrimasRoute: typeof MateriasPrimasRoute
   ProdutosRoute: typeof ProdutosRoute
   RelatoriosRoute: typeof RelatoriosRoute
+  UnidadesRoute: typeof UnidadesRoute
   UsuariosRoute: typeof UsuariosRoute
   FichaIdRoute: typeof FichaIdRoute
   ProdutoIdRoute: typeof ProdutoIdRoute
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/usuarios'
       fullPath: '/usuarios'
       preLoaderRoute: typeof UsuariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/unidades': {
+      id: '/unidades'
+      path: '/unidades'
+      fullPath: '/unidades'
+      preLoaderRoute: typeof UnidadesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/relatorios': {
@@ -327,6 +347,7 @@ const rootRouteChildren: RootRouteChildren = {
   MateriasPrimasRoute: MateriasPrimasRoute,
   ProdutosRoute: ProdutosRoute,
   RelatoriosRoute: RelatoriosRoute,
+  UnidadesRoute: UnidadesRoute,
   UsuariosRoute: UsuariosRoute,
   FichaIdRoute: FichaIdRoute,
   ProdutoIdRoute: ProdutoIdRoute,

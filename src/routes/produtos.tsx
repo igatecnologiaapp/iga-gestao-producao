@@ -4,12 +4,12 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   db,
   useDB,
-  UNITS,
   productCost,
   formatBRL,
   formatBRLOrEmpty,
   productStatus,
   missingProductFields,
+  unitOptionsFor,
   type Product,
   type Unit,
 } from "@/lib/store";
@@ -31,7 +31,7 @@ const emptyForm = {
 };
 
 function ProdutosPage() {
-  const { products, materials } = useDB();
+  const { products, materials, units } = useDB();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -183,7 +183,9 @@ function ProdutosPage() {
                   <span className="mb-1 block text-xs font-medium text-muted-foreground">Unidade (opcional)</span>
                   <select className="input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value as Unit })}>
                     <option value="">—</option>
-                    {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    {unitOptionsFor(units, form.unit || null).map((u) => (
+                      <option key={u.value} value={u.value}>{u.label}</option>
+                    ))}
                   </select>
                 </label>
                 <label className="block">
